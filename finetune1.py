@@ -1,74 +1,63 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[1]:
+
+
 import pandas as pd
 import os
 import torch.nn as nn
-import sys
+import pandas as pd
+from transformers import LongformerTokenizerFast, LongformerForSequenceClassification, Trainer, TrainingArguments, LongformerConfig, T5Config
+import torch.nn as nn
 import torch
-
-import pdb
-
+from torch.utils.data import Dataset, DataLoader
+import numpy as np
+from sklearn.metrics import accuracy_score, precision_recall_fscore_support
+import wandb
+import os
 import argparse
+os.environ["CUDA_VISIBLE_DEVICES"] = "1,2,3,4"
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--test', action='store_true', help='enable testing mode')
-# parser.add_argument('--freeze-encoder', action='store_true', help='freeze the encoder layers')
 parser.add_argument('--gpu-no', dest = 'GPU_NO', help='use GPU_NO specified')
-parser.add_argument('--model-ckpt-path', dest = 'MODEL_CKPT_PATH', help='use model checkpoint specified')
 args = parser.parse_args()
 
-testing = args.test
-# freeze_encoder = args.freeze_encoder
-GPU_NO = int(args.GPU_NO)
-model_ckpt_path = args.MODEL_CKPT_PATH
+for arg in ['test, GPU_NO']:
+    print("arg:", args.arg)
 
-print(f'Test mode: {testing}')
-# print(f'Freeze encoder: {freeze_encoder}')
-os.environ["CUDA_VISIBLE_DEVICES"] = str(GPU_NO)  # use the correct gpu
-device = torch.device(f'cuda' if torch.cuda.is_available() else 'cpu')
-print(f"device: {device}")
-if model_ckpt_path:
-    print(f"model checkpoint to use: {model_ckpt_path}")
-else:
-    print("no ckpt specified. Finetuning from base")
-# print(f"memory reserved: {torch.cuda.memory_reserved(device=device)} bytes")
+exit()
+
+
+# In[2]:
+
+
+config = T5Config()
+config
+
+
+# In[3]:
+
 
 root = '/home/ugrads/a/aa_ron_su/physionet.org/files/clinical-t5/1.0.0/'
-data_path = '/data/datasets/mimiciv_notes/physionet.org/files/mimic-iv-note/2.2/note/radiology.csv'
+data_path = '/data/datasets/mimiciv_notes/physionet.org/files/mimic-iv-note/2.2/note/discharge.csv'
 model_path = root + 'Clinical-T5-Base/'
+finetune_model_path = root + 'Clinical-T5-Base_ft_vent/'
 temivef_train_NOTE_TARGET1_FT_path = '/home/ugrads/a/aa_ron_su/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_train_NOTE_TARGET1_FT_rad.csv'
-
-out_dir = f"{os.environ.get('CLINICAL_DIR')}model{'_test' if testing else ''}_rad{'_from_ckpt1' if model_ckpt_path else ''}" #FIXME change to ckpt2 if necessary
-if not os.path.exists(out_dir):
-    os.makedirs(out_dir)
-model_out = os.path.join(out_dir,"meta_ft_classify.pt")
-print(f"model_out:{model_out}")
-
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 model_name = "Clinical-T5-Base"
-tokenizer = AutoTokenizer.from_pretrained("Clinical-T5-Base")
-model = AutoModelForSeq2SeqLM.from_pretrained("Clinical-T5-Base")
-
-train = pd.read_csv(temivef_train_NOTE_TARGET1_FT_path)
-print(f"reading notes and target from {temivef_train_NOTE_TARGET1_FT_path}")
-
-train_tensor_filename = f"{os.environ.get('CLINICAL_DIR')}tokenized_notes_rad/train_tensor.pt"
-train_tensors = None
-if os.path.isfile(train_tensor_filename):
-    train_tensors = torch.load(train_tensor_filename)
-    print(f"tokenized note input_ids loaded from {train_tensor_filename}")
-# else:
-#     train_texts = train['text'].tolist()
-#     tokenized_train_notes = tokenizer(train_texts, truncation=True, padding=True, return_tensors = "pt")
-#     train_tensor = tokenized_train_notes.input_ids
-#     torch.save(train_tensor, train_tensor_filename)
-#     print(f"train notes tokenized and saved to {train_tensor_filename}")
-# test_texts = test['text'].tolist()
-# tokenized_test_notes = tokenizer(test_texts, truncation=True, padding=True, return_tensors = "pt")
-# print("test notes tokenized")
+out_dir = f"{model_name}_out"
 
 
-from T5EncoderForSequenceClassification import T5EncoderForSequenceClassification
+# In[4]:
+
 
 from transformers import T5Config
+from T5EncoderForSequenceClassification import T5EncoderForSequenceClassification
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
 encoder = model.get_encoder() # we only need the clinical-t5 encoder for our purposes
 
 config = T5Config(
@@ -76,235 +65,146 @@ config = T5Config(
     classifier_dropout=None,
     num_labels=2,
     hidden_dropout_prob=0.01,
-    last_hidden_size=64
+    last_hidden_size=64,
+    gradient_checkpointing=True
 )
+classifier = T5EncoderForSequenceClassification(encoder, config)
 
-classifier = (
-    T5EncoderForSequenceClassification(encoder, config).to(device) 
-    if model_ckpt_path == None 
-    else torch.load(model_ckpt_path)
-)
 
-print(f"CLASSIFIER LOADED TO GPU: {torch.cuda.memory_allocated() / 2**20} Megabytes")
+# 
 
-from torch.utils.data import DataLoader, TensorDataset, RandomSampler
-from transformers import get_linear_schedule_with_warmup
-import numpy as np
+# In[5]:
 
-# Define training data
-train_inputs = train_tensors.input_ids.to(device)
-train_labels = torch.tensor(train['delta_in_2_days'].to_numpy()).to(device)
-train_dataset = TensorDataset(train_inputs, train_labels) 
 
-print(f"DATASET LOADED TO GPU: {torch.cuda.memory_allocated() / 2**20} Megabytes")
+train = pd.read_csv(temivef_train_NOTE_TARGET1_FT_path)
+print(f"reading notes and target from {temivef_train_NOTE_TARGET1_FT_path}")
 
-# FROM https://github.com/BoXHED/BoXHED2.0/blob/master/packages/boxhed/boxhed/model_selection.py
-# from boxhed.utils import temp_seed
-def group_k_fold(ID, num_folds, seed=None):
+
+# In[6]:
+
+
+def group_train_test(ID):
     ID             = ID.astype(int)
-    ID_unique_srtd = np.sort(np.unique(ID))
+    ID_unique_srtd = np.unique(ID)
+    np.random.shuffle(ID_unique_srtd)    
 
-    ID_counts = [len(ID_unique_srtd)//num_folds] * num_folds
-    for i in range(len(ID_unique_srtd)%num_folds):
-        ID_counts[i]+=1
+    num_train_ids = int(.80 * len(ID_unique_srtd))
+    train_ids = ID_unique_srtd[:num_train_ids]
+    val_ids = ID_unique_srtd[num_train_ids:]
 
-    assert sum(ID_counts)==len(ID_unique_srtd)
+    train = ID[ID.isin(train_ids)]
+    val = ID[ID.isin(val_ids)]
 
-    fold_idxs = np.hstack([[i]*id_count for i, id_count in enumerate(ID_counts)])
+    assert(len(train) + len(val) == len(ID))
+    assert(len(train_ids) + len(val_ids) == len(ID_unique_srtd))
+    assert(len(train_ids) + len(val_ids) == len(ID_unique_srtd))
 
-    # if seed is not None:
-    #     with temp_seed(seed):
-    #         np.random.shuffle(fold_idxs)
-    # else:
-    np.random.shuffle(fold_idxs)
+    return list(train.index), list(val.index)
 
-    gkf = []
-    for fold_idx in range(num_folds):
-        train_ids = ID_unique_srtd[np.where(fold_idxs!=fold_idx)[0]]
-        test_ids  = ID_unique_srtd[np.where(fold_idxs==fold_idx)[0]]
-        gkf.append((np.where(np.isin(ID, train_ids))[0], np.where(np.isin(ID, test_ids))[0]))
-    
-    return gkf
-
-# define 5 fold cv
-num_folds = 3
-kfold = group_k_fold(train['ICUSTAY_ID'], num_folds)
+train_idxs, val_idxs = group_train_test(train['ICUSTAY_ID'])
 
 
-batch_size = 5
-num_epochs = 10
-learning_rate = 1e-8
-# max_grad_norm = 1.0
+# In[7]:
 
 
-from torch.utils.data import Subset
-import torch.optim as optim
-from tqdm import tqdm
-from time import time
-import random
-from transformers import Adafactor
+from datasets import Dataset
+target = 'delta_in_2_days'
+train = train.rename(columns = {target:'label'})
 
-criterion = nn.MSELoss()
-optimizer = Adafactor(
-    classifier.parameters(),
-    lr=learning_rate, 
-    scale_parameter=False, 
-    relative_step=False
-    # scale_parameter=True,
-    # relative_step=True
+train_data = train.iloc[train_idxs]
+val_data = train.iloc[val_idxs]
+
+train_data = Dataset.from_pandas(train_data).select_columns(['text', 'label'])
+val_data = Dataset.from_pandas(val_data).select_columns(['text', 'label'])
+
+if not os.path.exists(f'{out_dir}/data_cache'):
+    # define a function that will tokenize the model, and will return the relevant inputs for the model
+    def tokenization(batched_text):
+        return tokenizer(batched_text['text'], padding = 'max_length', truncation=True, max_length = 512)
+
+    train_data = train_data.map(tokenization, batched = True, batch_size = len(train_data) // 10)
+    val_data = val_data.map(tokenization, batched = True, batch_size = len(val_data) // 10)
+
+    train_data.save_to_disk(f'{out_dir}/data_cache/tokenized_train_data')
+    val_data.save_to_disk(f'{out_dir}/data_cache/tokenized_val_data')
+
+else: 
+    print(f'loading train, val from', f'{out_dir}/data_cache/')
+    train_data = train_data.load_from_disk(f'{out_dir}/data_cache/tokenized_train_data')
+    val_data = val_data.load_from_disk(f'{out_dir}/data_cache/tokenized_val_data')
+
+train_data.set_format('torch', columns=['input_ids', 'attention_mask', 'label'])
+val_data.set_format('torch', columns=['input_ids', 'attention_mask', 'label'])
+
+train_data = train_data.remove_columns('text')
+val_data = val_data.remove_columns('text')
+
+
+# In[8]:
+
+
+# define accuracy metrics
+def compute_metrics(pred):
+    labels = pred.label_ids
+    preds = pred.predictions.argmax(-1)
+    # argmax(pred.predictions, axis=1)
+    #pred.predictions.argmax(-1)
+    precision, recall, f1, _ = precision_recall_fscore_support(labels, preds, average='binary')
+    acc = accuracy_score(labels, preds)
+    return {
+        'accuracy': acc,
+        'f1': f1,
+        'precision': precision,
+        'recall': recall
+    }
+
+
+# In[10]:
+
+
+# define the training arguments
+training_args = TrainingArguments(
+    output_dir = f'{out_dir}/results',
+    num_train_epochs = 5,
+    per_device_train_batch_size = 2,
+    gradient_accumulation_steps = 8,    
+    per_device_eval_batch_size= 4,
+    evaluation_strategy = "epoch",
+    save_strategy="epoch",
+    disable_tqdm = False, 
+    load_best_model_at_end=True,
+    warmup_steps=200,
+    weight_decay=0.01,
+    logging_steps = 8,
+    fp16 = True,
+    logging_dir=f'{out_dir}/logs',
+    dataloader_num_workers = 0,
+    run_name = 't5_radiology_run1'
 )
-# optimizer = optim.AdamW(classifier.classifier.parameters(), lr=learning_rate, eps=adam_epsilon)
-
-# freeze encoder weights
-# if freeze_encoder:
-#     for param in classifier.encoder.parameters():
-#         param.requires_grad = False
-#     classifier.encoder.eval()
-# else:
-classifier.encoder.train()
-# set classifier head to train
-classifier.classifier.train()
-
-def check_encoder_grad(encoder):
-    # check if encoder parameters have gradients
-    for name, param in encoder.named_parameters():
-        if param.requires_grad:
-            print(name, param.grad is not None)
-
-def forward(model, batch):
-        inputs, labels = batch
-        # print(f"BEFORE TRAIN FORWARD: {torch.cuda.memory_allocated() / 2**20} Megabytes")
-        outputs = model.forward(inputs, labels=labels)
-        # print(f"AFTER TRAIN FORWARD: {torch.cuda.memory_allocated() / 2**20} Megabytes")
-        return outputs
-
-def do_step(loss, model):
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-        
-        # loss.backward()
-        # # torch.nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
-        # optimizer.step()
-        # optimizer.zero_grad()
-        
-        # scheduler.step()
-        # # if step % 5 == 0:
-
-def print_status(mode, epoch, num_epochs, fold, num_folds, step, num_steps, loss_val, start_time):
-    print(f"Epoch {epoch + 1}/{num_epochs} | Fold {fold + 1}/{num_folds} | Step {step}/{num_steps} | Loss_{mode} {loss_val:.4f} | Time {time() - start_time : .2f} seconds | GPU_USAGE: {torch.cuda.memory_allocated() / 2**20} Megabytes")        
 
 
-# num_batches = len(train_dataset) / batch_size * num_folds * ((num_folds - 1)/ num_folds)
-# total_steps = int(num_batches * num_epochs)
-# print(f"num_batches = {len(train_dataset)} / {batch_size} * {num_folds} * ({(num_folds - 1)}/ {num_folds}) = {num_batches}")
-# print(f"total_steps = {num_batches} * {num_epochs} = {total_steps}")
-
-# scheduler = get_linear_schedule_with_warmup(
-#     optimizer,
-#     num_warmup_steps=0,
-#     num_training_steps=total_steps 
-# )
-
-# FINETUNE ###########################################################################
-print("starting finetune")
-start_time = time()
-
-best_val_loss = float("inf")
-epochs_since_improvement = 0
-patience = 2
-
-all_train_step_losses = []
-all_val_step_losses = []
-
-epoch_train_losses = []
-epoch_val_losses = []
-
-for epoch in range(num_epochs):
-    # if testing and epoch >= 1:
-    #     break
-
-    fold_train_losses = []
-    fold_val_losses = []
-
-    for fold, (train_idx, val_idx) in enumerate(kfold):
-        print("len train_idx:", len(train_idx))
-        train_set = Subset(train_dataset, train_idx)
-        # pdb.set_trace()
-        train_dataloader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
-
-        batch_train_losses = []
-        batch_val_losses = []
-
-        for step, batch in enumerate(train_dataloader):
-            if (testing and step >= 10):
-                break
-
-            outputs = forward(classifier, batch)
-            do_step(outputs.loss, classifier)
-
-            batch_train_losses.append(outputs.loss.item())
-            if step % 10 == 0:
-                print_status('train', epoch, num_epochs, fold, num_folds, step, len(train_dataloader), outputs.loss.item(), start_time)
-        
-        torch.cuda.empty_cache()
-
-        print("len val_idx:", len(val_idx))
-        val_set = Subset(train_dataset, val_idx)
-        val_dataloader = DataLoader(val_set, batch_size=batch_size, shuffle=True)
-
-        with torch.no_grad():
-            for step, batch in enumerate(val_dataloader):
-                if (testing and step >= 10):
-                    break
-                
-                outputs = forward(classifier, batch)
-                batch_val_losses.append(outputs.loss.item())
-                if step % 10 == 0:
-                    print_status('val', epoch, num_epochs, fold, num_folds, step, len(val_dataloader), outputs.loss.item(), start_time)
-
-        fold_train_losses.append(np.mean(batch_train_losses))
-        fold_val_losses.append(np.mean(batch_val_losses))
-
-        all_train_step_losses.append(batch_train_losses)
-        all_val_step_losses.append(batch_val_losses)
-
-        print(f'\n\tFOLD {fold + 1} HAS AVG TRAIN, VAL LOSS: {fold_train_losses[fold]},{fold_val_losses[fold]}\n')
-
-    epoch_train_losses.append(np.mean(fold_train_losses))
-    epoch_val_losses.append(np.mean(fold_val_losses))
-
-    print(f'\n\tEPOCH {epoch + 1} HAS AVG TRAIN, VAL LOSS: {epoch_train_losses[epoch]},{epoch_val_losses[epoch]}\n')
-    if epoch_val_losses[epoch] < best_val_loss:
-        best_val_loss = epoch_val_losses[epoch]
-        epochs_since_improvement = 0
-    else:
-        epochs_since_improvement += 1
-    if epochs_since_improvement >= patience:
-        print(f"Validation loss did not improve for {patience} epochs. Early stopping...")
-        break
+# In[11]:
 
 
-torch.save(classifier, model_out)
+# instantiate the trainer class and check for available devices
+trainer = Trainer(
+    model=classifier,
+    args=training_args,
+    compute_metrics=compute_metrics,
+    train_dataset=train_data,
+    eval_dataset=val_data
+)
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+device
 
-print(f"model weights saved to path {model_out}")
 
-import json
-# train_losses_json = json.dumps(train_losses)
-# val_losses_json = json.dumps(val_losses)
+# In[12]:
 
 
+import wandb
+wandb.init()
+print(wandb.run.get_url())
+trainer.train()
 
-with open(os.path.join(out_dir,"epoch_train_losses.json"), "w") as outfile:
-    json.dump(epoch_train_losses, outfile)
 
-with open(os.path.join(out_dir,"epoch_val_losses.json"), "w") as outfile:
-    json.dump(epoch_val_losses, outfile)
-
-with open(os.path.join(out_dir,"all_train_step_losses.json"), "w") as outfile:
-    json.dump(all_train_step_losses, outfile)
-
-with open(os.path.join(out_dir,"all_val_step_losses.json"), "w") as outfile:
-    json.dump(all_val_step_losses, outfile)
-
-print(f"losses saved to path {out_dir}")
+# %%
