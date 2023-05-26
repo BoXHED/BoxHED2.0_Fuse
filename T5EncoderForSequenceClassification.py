@@ -2,18 +2,27 @@ import torch
 from torch import nn
 from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
 from transformers.modeling_outputs import SequenceClassifierOutput
+
+# class T5EncoderClassificationConfig(T5Config):
+#     def __init__(self, **kwargs):
+#         super().__init__(**kwargs)
+#         self.num_labels = 2
+#         self.last_hidden_size=64
+
 class T5EncoderClassificationHead(nn.Module):
     """Head for sentence-level classification tasks."""
 
     def __init__(self, config):
         super().__init__()
+
+        self.last_hidden_size = config.last_hidden_size # janky workaround
+        self.num_labels = config.num_labels
+
         self.dense = nn.Linear(config.hidden_size, config.hidden_size)
-        classifier_dropout = (
-            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
-        )
-        self.last_dense = nn.Linear(config.hidden_size, config.last_hidden_size)
+        classifier_dropout = config.dropout_rate
+        self.last_dense = nn.Linear(config.hidden_size, self.last_hidden_size)
         self.dropout = nn.Dropout(classifier_dropout)
-        self.out_proj = nn.Linear(config.last_hidden_size, config.num_labels)
+        self.out_proj = nn.Linear(self.last_hidden_size, self.num_labels)
         self.last_hidden_state = None
 
     def forward(self, hidden_states, return_embeddings, **kwargs):
@@ -44,9 +53,10 @@ class T5EncoderForSequenceClassification(torch.nn.Module):
         super().__init__()
         self.num_labels = config.num_labels
         self.config = config
+        # self.config.gradient_checkpointing = True # janky fix
 
-        self.encoder = t5_encoder.double()  # already initialized model
-        self.classifier = T5EncoderClassificationHead(config).double() # defined above
+        self.encoder = t5_encoder  # already initialized model
+        self.classifier = T5EncoderClassificationHead(config) # defined above
 
     def forward(
         self,
@@ -67,15 +77,17 @@ class T5EncoderForSequenceClassification(torch.nn.Module):
         """
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
+        assert(input_ids.device == attention_mask.device and input_ids.device == self.encoder.device)
         encoder_outputs = self.encoder(
             input_ids=input_ids,
             attention_mask=attention_mask,
-            inputs_embeds=inputs_embeds,
-            head_mask=head_mask,
-            output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states,
-            return_dict=return_dict,
+            # inputs_embeds=inputs_embeds,
+            # head_mask=head_mask,
+            # output_attentions=output_attentions,
+            # output_hidden_states=output_hidden_states,
+            # return_dict=return_dict,
         )
+        print(f'encoder_outputs: {encoder_outputs}')
 
         sequence_output = encoder_outputs[0]
         logits, classifier_last_hidden_state = self.classifier(sequence_output, return_embeddings)
@@ -86,6 +98,7 @@ class T5EncoderForSequenceClassification(torch.nn.Module):
                 if self.num_labels == 1:
                     self.config.problem_type = "regression"
                 elif self.num_labels > 1 and (labels.dtype == torch.long or labels.dtype == torch.int):
+                    print("single label classification!")
                     self.config.problem_type = "single_label_classification"
                 else:
                     self.config.problem_type = "multi_label_classification"
@@ -110,7 +123,9 @@ class T5EncoderForSequenceClassification(torch.nn.Module):
         if return_embeddings: 
             return classifier_last_hidden_state
 
-        return SequenceClassifierOutput(           
+        print(f'computing loss from logits = {logits}, labels = {labels}')  
+        print(f'loss = {loss}')  
+        return SequenceClassifierOutput(         
             loss=loss,
             logits=logits,
             attentions=encoder_outputs.attentions,
