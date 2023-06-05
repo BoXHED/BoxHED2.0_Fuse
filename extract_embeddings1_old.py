@@ -1,15 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[ ]:
-
-
-
-
-
-# In[18]:
-
-
 import os
 import torch
 import argparse
@@ -114,7 +102,7 @@ print(f'classifier loaded from {finetuned_model_path}, class is {classifier.__cl
 if testing:
     tokenized_train_notes = tokenized_train_notes[:12]
     tokenized_test_notes = tokenized_test_notes[:12]
-    print(f"testing mode truncLated tokenized_notes to length {len(tokenized_train_notes)}")
+    print(f"testing mode truncated tokenized_notes to length {len(tokenized_train_notes)}")
 
 
 from torch.utils.data import DataLoader, TensorDataset
@@ -125,8 +113,8 @@ import torch
 # train_data.set_format('torch', columns=['input_ids', 'attention_mask', 'label']) # FIXME this is more elegant...
 # val_data.set_format('torch', columns=['input_ids', 'attention_mask', 'label'])
 def generate_dataloader(tokenized_notes, batch_size, device):
-    input_ids = torch.tensor(tokenized_notes.input_ids, dtype=torch.long)
-    attention_mask = torch.tensor(tokenized_notes.attention_mask, dtype=torch.long)
+    input_ids = torch.Tensor(tokenized_notes.input_ids)
+    attention_mask = torch.Tensor(tokenized_notes.attention_mask)
 
     tdataset = TensorDataset(input_ids.to(device),
                             attention_mask.to(device),
@@ -135,7 +123,7 @@ def generate_dataloader(tokenized_notes, batch_size, device):
     # shuffle is false so that notes retain their order for concat with df
     return dataloader
 
-batch_size = 48
+batch_size = 6
 train_dataloader = generate_dataloader(tokenized_train_notes, batch_size, device)
 test_dataloader = generate_dataloader(tokenized_test_notes, batch_size, device)
 print("train, test, dataloaders generated")
@@ -144,10 +132,6 @@ print("train, test, dataloaders generated")
 # classifier.encoder.eval() # makes sure dropout does not occur
 # classifier.classifier.eval()
 # print(f"loaded classifier from {finetuned_model_path}")
-
-
-# In[19]:
-
 
 classifier.encoder.eval()
 classifier.classifier.eval()
@@ -173,24 +157,6 @@ train_embeddings_df = extract_embeddings(train_dataloader, classifier)
 print("finished train embedding extraction") 
 test_embeddings_df = extract_embeddings(test_dataloader, classifier)
 print("finished test embedding extraction")
-
-
-# In[ ]:
-
-
-# for step, batch in enumerate(train_dataloader):
-#     # Assuming each batch consists of input_ids, attention_mask, and labels
-#     input_ids, attention_mask = batch
-
-#     # Print or examine the data in each batch
-#     print('step:', step)
-#     print('Input IDs:', input_ids)
-#     print('Attention Mask:', attention_mask)
-
-#     print('---')
-
-
-# In[21]:
 
 
 for mode in ["train", "test"]:
@@ -236,7 +202,6 @@ def merge_and_fill_embeddings(df_small, df_big):
     print(f"No. nonnull embedding rows in out_df: {len(out_df[pd.notna(out_df['emb0'])])}")
     return out_df
 
-print("merging and filling embeddings...")
 train_out_df = merge_and_fill_embeddings(train_df_small, train_df_big)
 print("merged and filled embeddings for train_out_df")
 test_out_df = merge_and_fill_embeddings(test_df_small, test_df_big)
@@ -259,10 +224,3 @@ train_out_df.to_csv(train_outpath, index = False)
 print("wrote to", train_outpath)
 test_out_df.to_csv(test_outpath, index = False)
 print("wrote to", test_outpath)
-
-
-# In[ ]:
-
-
-
-
