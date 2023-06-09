@@ -72,9 +72,16 @@ class ClinicalLongformerForSequenceClassification(nn.Module):
 
         assert(input_ids.device == attention_mask.device 
                and input_ids.device == self.encoder.device)
+        
+        # print("Initializing global attention on CLS token...")
+        global_attention_mask = torch.zeros_like(input_ids)
+        # global attention on cls token
+        global_attention_mask[:, 0] = 1
+
         encoder_outputs = self.encoder(
             input_ids=input_ids,
             attention_mask=attention_mask,
+            # global_attention_mask=global_attention_mask,
             inputs_embeds=inputs_embeds,
             head_mask=head_mask,
             output_attentions=output_attentions,
@@ -82,8 +89,22 @@ class ClinicalLongformerForSequenceClassification(nn.Module):
             return_dict=return_dict,
         )
 
+        # self.longformer(
+        #     input_ids,
+        #     attention_mask=attention_mask,
+        #     global_attention_mask=global_attention_mask,
+        #     head_mask=head_mask,
+        #     token_type_ids=token_type_ids,
+        #     position_ids=position_ids,
+        #     inputs_embeds=inputs_embeds,
+        #     output_attentions=output_attentions,
+        #     output_hidden_states=output_hidden_states,
+        #     return_dict=return_dict,
+        # )
+
         sequence_output = encoder_outputs[0]
-        logits, classifier_last_hidden_state = self.classifier(sequence_output, return_embeddings)
+        logits, classifier_last_hidden_state = self.classifier(
+            sequence_output, return_embeddings)
 
         loss = None
         if labels is not None:
@@ -110,8 +131,8 @@ class ClinicalLongformerForSequenceClassification(nn.Module):
                 loss = loss_fct(logits, labels)
         
         assert(loss.item() != None)
-        print(f'loss: {loss.item()}')
-        loss = loss.unsqueeze(0) # FIXME only use this if training on multi-GPU
+        # print(f'loss: {loss.item()}')
+        # loss = loss.unsqueeze(0) # FIXME only use this if training on multi-GPU
 
         if return_embeddings: 
             return classifier_last_hidden_state

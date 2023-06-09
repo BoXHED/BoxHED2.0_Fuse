@@ -23,7 +23,7 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('--test', action='store_true', help='enable testing mode')
 parser.add_argument('--use-wandb', action = 'store_true', help = 'enable wandb')
-parser.add_argument('--gpu-no', dest = 'GPU_NO', help='use GPU_NO specified (this may be a single number or several 1 or 1,2,3,4)')
+parser.add_argument('--gpu-no', dest = 'GPU_NO', help='use GPU_NO specified (this may be a single number or several. eg: 1 or 1,2,3,4)')
 parser.add_argument('--note-type', dest = 'note_type', help='which notes, radiology or discharge?')
 parser.add_argument('--model-name', dest = 'model_name', help='model to finetune. ex: "Clinical-T5-Base"')
 parser.add_argument('--model-type',  dest = 'model_type', help="T5 or LongFormer or Ckpt?")
@@ -56,8 +56,8 @@ for arg in vars(args):
     print(f"\t{arg}: {getattr(args, arg)}")
 
 if use_wandb:
-    wandb.login(key='2d62d7b2eea887cdb7783efd1978840a648f3fca') # suaaron
-    # wandb.login(key='7b5d4393e8517657a9e973ce0133b4ffbd97ad3d') # aa_ron_su
+    # wandb.login(key='2d62d7b2eea887cdb7783efd1978840a648f3fca') # suaaron
+    wandb.login(key='7b5d4393e8517657a9e973ce0133b4ffbd97ad3d', relogin=True) # aa_ron_su
 
 os.environ["CUDA_VISIBLE_DEVICES"] = GPU_NO
 os.environ["WANDB_DISABLED"] = f"{'true' if not use_wandb else 'false'}"
@@ -98,8 +98,8 @@ elif model_type == 'Longformer':
         classifier = torch.load(ckpt_model_path)
         print('loaded model from ckpt model path:', ckpt_model_path)
     else:
-        from transformers import AutoModelForSeq2SeqLM, AutoModel
-        model = AutoModelForSequenceClassification.from_pretrained(model_path,                                                 num_labels = 2, gradient_checkpointing = True)
+        from transformers import AutoModel
+        model = AutoModelForSequenceClassification.from_pretrained(model_path, num_labels = 2, gradient_checkpointing = True)
         longformer = model.get_submodule('longformer')
         config_new = longformer.config
         config_new.num_labels=2
@@ -202,16 +202,12 @@ def compute_metrics(pred):
 training_args = TrainingArguments(
     output_dir = f'{out_dir}/results',
     num_train_epochs = num_epochs,
-    per_device_train_batch_size = 3,#5 # 2
-    gradient_accumulation_steps = 6,#3  # 8
-    per_device_eval_batch_size= 6,#10  # 4
     evaluation_strategy = "epoch",
     save_strategy="epoch",
     disable_tqdm = False, 
     load_best_model_at_end=True,
     warmup_steps=200,
     weight_decay=0.01,
-    logging_steps = 15, # make it 15
     fp16 = True,
     logging_dir=f'{out_dir}/logs',
     dataloader_num_workers = 0,
@@ -219,7 +215,16 @@ training_args = TrainingArguments(
 )
 if model_type == 'Longformer':
     training_args.learning_rate = 2e-5
-
+    training_args.per_device_batch_size = 2
+    training_args.gradient_accumulation_steps = 2 #3  # 8
+    training_args.per_device_eval_batch_size = 4
+    training_args.logging_steps = 4
+    # training_args.fp16_backend="amp"    
+elif model_type == 'T5':
+    training_args.per_device_train_batch_size = 2 #5 # 2
+    training_args.gradient_accumulation_steps = 8 #3  # 8
+    training_args.per_device_eval_batch_size= 4 #10  # 4
+    training_args.logging_steps = 4
 
 # In[11]:
 # from transformers.callbacks import ModelCheckpoint
@@ -248,7 +253,8 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 # In[12]:
 
 if use_wandb:
-    wandb.init(project='finetune llm', name=training_args.run_name)
+    resume = ckpt_dir != None
+    wandb.init(project='finetune llm', name=training_args.run_name, resume=resume)
     wandb.run.name = training_args.run_name
     print(wandb.run.get_url())
 

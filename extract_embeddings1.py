@@ -91,7 +91,7 @@ assert(tokenizer != None)
 
 def df_to_tokens_ds(data):
     data = Dataset.from_pandas(data).select_columns(['text', 'label'])
-    data = data.map(partial(tokenization, tokenizer, note_type, model_type), batched = True, batch_size = len(train_data) // 10)
+    data = data.map(partial(tokenization, tokenizer, max_length=512), batched = True, batch_size = len(train_data) // 10) # def tokenization(tokenizer, batched_text, max_length):
     data = data.remove_columns('text')
     return data
 target = 'delta_in_2_days'

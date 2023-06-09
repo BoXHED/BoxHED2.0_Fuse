@@ -91,7 +91,8 @@ class T5EncoderForSequenceClassification(torch.nn.Module):
         # print(f'encoder_outputs: {encoder_outputs}')
 
         sequence_output = encoder_outputs[0]
-        logits, classifier_last_hidden_state = self.classifier(sequence_output, return_embeddings)
+        logits, classifier_last_hidden_state = self.classifier(
+            sequence_output, return_embeddings)
 
         loss = None
         if labels is not None:
