@@ -56,8 +56,8 @@ for arg in vars(args):
     print(f"\t{arg}: {getattr(args, arg)}")
 
 if use_wandb:
-    # wandb.login(key='2d62d7b2eea887cdb7783efd1978840a648f3fca') # suaaron
-    wandb.login(key='7b5d4393e8517657a9e973ce0133b4ffbd97ad3d', relogin=True) # aa_ron_su
+    wandb.login(key='2d62d7b2eea887cdb7783efd1978840a648f3fca') # suaaron
+    # wandb.login(key='7b5d4393e8517657a9e973ce0133b4ffbd97ad3d', relogin=True) # aa_ron_su
 
 os.environ["CUDA_VISIBLE_DEVICES"] = GPU_NO
 os.environ["WANDB_DISABLED"] = f"{'true' if not use_wandb else 'false'}"

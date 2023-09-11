@@ -14,6 +14,7 @@ import os
 import torch
 import argparse
 import pandas as pd
+import re
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--test', action='store_true', help='enable testing mode')
@@ -62,7 +63,8 @@ temivef_train_NOTE_TARGET1_FT_path = f'/home/ugrads/a/aa_ron_su/JSS_SUBMISSION_N
 temivef_test_NOTE_TARGET1_FT_path = f'/home/ugrads/a/aa_ron_su/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_test_NOTE_TARGET1_FT_{"rad" if note_type == "radiology" else ""}.csv'
 temivef_train_NOTE_path = f'/home/ugrads/a/aa_ron_su/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_train_NOTE_{"rad" if note_type == "radiology" else ""}.csv'
 temivef_test_NOTE_path = f'/home/ugrads/a/aa_ron_su/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_test_NOTE_{"rad" if note_type == "radiology" else ""}.csv'
-outfolder = f"{model_name}_{'rad' if note_type == 'radiology' else 'dis'}_{'test_' if testing else ''}out/{run_cntr}"
+epoch = re.findall(r'\d+', ckpt_model_name)[-1]
+outfolder = f"{model_name}_{'rad' if note_type == 'radiology' else 'dis'}_{'test_' if testing else ''}out/{run_cntr}/from_epoch{epoch}"
 out_dir = f'/home/ugrads/a/aa_ron_su/JSS_SUBMISSION_NEW/data/final/{outfolder}/' # modify this line!
 
 train_outpath = os.path.join(out_dir, 'till_end_mimic_iv_extra_features_train.csv')
