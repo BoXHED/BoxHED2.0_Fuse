@@ -4,6 +4,7 @@
 #     tokenize_notes.py
 #     finetune1.py
 #     extract_embeddings1.py
+
 import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('--dryrun', action='store_true', help='enable dryrun')
@@ -16,8 +17,10 @@ import time
 import os
 
 
+
+
 # Define the list of scripts to run
-mimic_extract_dir = '/home/ugrads/a/aa_ron_su/JSS_SUBMISSION_NEW'
+mimic_extract_dir = '../JSS_SUBMISSION_NEW'
 note_dir = '/data/datasets/mimiciv_notes/physionet.org/files/mimic-iv-note/2.2/note/'
 clinical_dir = '/home/ugrads/a/aa_ron_su/physionet.org/files/clinical-t5/1.0.0/'
 radiology_path = os.path.join(note_dir, 'radiology.csv')
@@ -25,9 +28,11 @@ discharge_path = os.path.join(note_dir, 'discharge.csv')
 log_dir = f'./logs/{"dryrun" if dryrun else ""}'
 if not os.path.exists(log_dir):
     os.makedirs(log_dir)
-
+'''
+add_notes: inserts note data for each 
+'''
 script_list = [
-    (os.path.join(mimic_extract_dir, 'add_notes.py'), [], True), # -- test
+    (os.path.join(mimic_extract_dir, 'add_notes.py'), [], True), # -- test --note-type 
     (os.path.join(clinical_dir, 'generate_targets.py'), [], True),
     (os.path.join(clinical_dir, 'tokenize_notes.py'), [], True),
     (os.path.join(clinical_dir, 'finetune1.py'), ['--test','--gpu-no', '1'], True), # --test --gpu-no --model-ckpt-path # FIXME add model ckpt path if necessary
