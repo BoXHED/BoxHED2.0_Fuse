@@ -45,12 +45,8 @@ print("finetune1.py args:")
 for arg in vars(args):
     print(f"\t{arg}: {getattr(args, arg)}")
 
-if ags.use_wandb:
-    # wandb.login(key=os.getenv('WANDB_KEY_PERSONAL'), relogin = True)
-    wandb.login(key=os.getenv('WANDB_KEY_TAMU'), relogin = True)
-
 os.environ["CUDA_VISIBLE_DEVICES"] = args.GPU_NO
-os.environ["WANDB_DISABLED"] = f"{'true' if not ags.use_wandb else 'false'}"
+# os.environ["WANDB_DISABLED"] = f"{'true' if not args.use_wandb else 'false'}"
 
 root = '/home/ugrads/a/aa_ron_su/physionet.org/files/clinical-t5/1.0.0/'
 temivef_train_NOTE_TARGET1_FT_path = \
@@ -237,15 +233,6 @@ elif args.model_type == 'T5':
     training_args.per_device_eval_batch_size= 4 #10  # 4
     training_args.logging_steps = 4
 
-# In[11]:
-# from transformers.callbacks import ModelCheckpoint
-# checkpoint_callback = ModelCheckpoint(
-#     dirpath=output_dir,
-#     filename="model-{epoch:02d}",
-#     save_top_k=-1,  # Save all models
-#     monitor="epoch",
-# )
-
 # instantiate the trainer class and check for available devices
 from MyTrainer import MyTrainer
 
@@ -261,9 +248,10 @@ if args.ckpt_dir:
     print('loaded trainer from trainer ckpt dir:', args.ckpt_dir)
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-# In[12]:
-
-if ags.use_wandb:
+if args.use_wandb:
+    # wandb.login(key=os.getenv('WANDB_KEY_PERSONAL'), relogin = True)
+    wandb.login(key=os.getenv('WANDB_KEY_TAMU'), relogin = True)
+    
     resume = args.ckpt_dir != None
     wandb.init(project='finetune llm', name=training_args.run_name, resume=resume)
     wandb.run.name = training_args.run_name
@@ -281,6 +269,3 @@ best_checkpoint_path = trainer.state.best_model_checkpoint
 logging.info(f"best_checkpoint_path: {best_checkpoint_path}")
 
 print(f"RUN {training_args.run_name} FINISHED: check out_dir! {out_dir}")
-
-
-# %%
