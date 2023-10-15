@@ -5,6 +5,8 @@ import os
 import wandb
 from tqdm.auto import tqdm
 from log_artifact import log_artifact
+from functools import partial
+
 tqdm.pandas()
 
 def generate_stay_and_note_timing_table(relevant_subjects, stays, notes):
@@ -47,6 +49,7 @@ def generate_stay_and_note_timing_table(relevant_subjects, stays, notes):
         stay_note_timing = stay_note_timing.groupby('SUBJECT_ID', group_keys=True).apply(lambda x: x.sort_values('DATETIME'))
         stay_note_timing.reset_index(drop=True, inplace=True)
         stay_note_timing.infer_objects()
+
         return stay_note_timing
     
     def _fillna_icustay_by_subject(stay_note_timing_by_subject):
@@ -83,22 +86,25 @@ def generate_stay_and_note_timing_table(relevant_subjects, stays, notes):
     stay_note_timing['INTIME'] = pd.to_datetime(stay_note_timing['INTIME'])
 
     stay_note_timing = stay_note_timing.convert_dtypes(infer_objects=True)
-
+    
+    stay_note_timing.dropna(inplace=True) # remove 'stay' rows which don't contain notes
     return stay_note_timing
 
-def _insert_note_data_by_stay(mimic_iv_train_per_stay):
+def _insert_note_data_by_stay(mimic_iv_train_per_stay, how = "recent"):
     ''' FIXME this needs to get ALL NOTES, not just most recent note.
     for time series data for a single icustay, populate most recent note id, returning None if there are no previous notes
 
     args:
-        mimic_iv_train_per_stay, a dataframe containing time series data for a single icu stay
+        mimic_iv_train_per_stay: a dataframe containing time series data for a single icu stay
+        how: from ["recent", "all"] determines how to insert note data. 
+            if how = "recent", gets most recent note.
+            if how = "all", gets all notes and stores them as a list.
     
     returns:
-        time series data with most recent NOTE_ID in new column 'NOTE_ID'
+        time series data with NOTE_ID in new column 'NOTE_ID'
     '''
     def _populate_recent_note_id(row):
         stay_note_timing_for_subject = stay_note_timing[stay_note_timing['SUBJECT_ID'] == row['SUBJECT_ID']]
-        stay_note_timing_for_subject.dropna(inplace=True) # remove 'stay' rows which don't contain notes
         prev_notes = stay_note_timing_for_subject[stay_note_timing_for_subject['DATETIME'] < row['t_start_DT']]['NOTE_ID']
         
         if prev_notes.empty:
@@ -106,28 +112,47 @@ def _insert_note_data_by_stay(mimic_iv_train_per_stay):
             return row
         row['NOTE_ID'] = prev_notes.iloc[-1]
         return row
-        
-    mimic_iv_train_per_stay = mimic_iv_train_per_stay.apply(_populate_recent_note_id, axis=1)
+
+    def _populate_all_note_ids(row):
+        stay_note_timing_for_subject = stay_note_timing[stay_note_timing['SUBJECT_ID'] == row['SUBJECT_ID']]
+        prev_notes = stay_note_timing_for_subject[stay_note_timing_for_subject['DATETIME'] < row['t_start_DT']]['NOTE_ID']
+        row['NOTE_ID'] = prev_notes.tolist()
+        return row
+    
+    if how == "recent":
+        mimic_iv_train_per_stay = mimic_iv_train_per_stay.apply(_populate_recent_note_id, axis=1)
+    elif how == "all":
+        mimic_iv_train_per_stay = mimic_iv_train_per_stay.apply(_populate_all_note_ids, axis=1)
     return mimic_iv_train_per_stay
 
 def _populate_time_since_note(row):
-    if (pd.isnull(row['NOTE_ID'])):
-        row['time_since_note'] = None
-        return row
-    charttime = stay_note_timing[stay_note_timing['NOTE_ID'] == row['NOTE_ID']]['DATETIME']
-    time_since_note = (row['t_start_DT'] - charttime.iloc[0]).total_seconds()/3600
-    row['time_since_note'] = time_since_note
+    if isinstance(row['NOTE_ID'], list):
+        if row['NOTE_ID'] == []:
+            row['time_since_note'] = None
+        else:
+            charttime = stay_note_timing[stay_note_timing['NOTE_ID'] == row['NOTE_ID'][-1]]['DATETIME']
+            time_since_note = (row['t_start_DT'] - charttime.iloc[0]).total_seconds()/3600
+            row['time_since_note'] = time_since_note
+    else:
+        if pd.isna(row['NOTE_ID']):
+            row['time_since_note'] = None
+        else:
+            charttime = stay_note_timing[stay_note_timing['NOTE_ID'] == row['NOTE_ID']]['DATETIME']
+            time_since_note = (row['t_start_DT'] - charttime.iloc[0]).total_seconds()/3600
+            row['time_since_note'] = time_since_note
     return row
 
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--test', action='store_true', help='enable testing mode')
-parser.add_argument('--note-type', dest = 'note_type', help='which notes, radiology or discharge?')
 parser.add_argument('--use-wandb', action = 'store_true', help = 'enable wandb', default=False)
+parser.add_argument('--note-type', dest = 'note_type', help='kw: radiology or discharge')
+parser.add_argument('--noteid-mode', dest = 'noteid_mode', help = 'kw: all or recent')
 args = parser.parse_args()
 
 assert(args.note_type == 'radiology' or args.note_type == 'discharge')
+assert(args.noteid_mode == 'all' or args.noteid_mode == 'recent')
 
 trainpath = '/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_train.csv' #mimic_iv_train.csv'
 testpath = '/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_test.csv' #mimic_iv_test.csv'
@@ -154,14 +179,14 @@ if args.test:
 
 all_stays = pd.read_csv('/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION_NEW/tmp/all_stays.csv')
 
-discharge = pd.read_csv('/data/datasets/mimiciv_notes/physionet.org/files/mimic-iv-note/2.2/note/discharge.csv')
-discharge.rename(columns={'subject_id':'SUBJECT_ID'}, inplace = True)
-discharge.rename(columns={'note_id':'NOTE_ID'}, inplace = True)
-
-radiology = pd.read_csv('/data/datasets/mimiciv_notes/physionet.org/files/mimic-iv-note/2.2/note/radiology.csv')
-radiology.rename(columns={'subject_id':'SUBJECT_ID'}, inplace = True)
-radiology.rename(columns={'note_id':'NOTE_ID'}, inplace = True)
-
+if args.note_type == 'discharge':
+    discharge = pd.read_csv('/data/datasets/mimiciv_notes/physionet.org/files/mimic-iv-note/2.2/note/discharge.csv')
+    discharge.rename(columns={'subject_id':'SUBJECT_ID'}, inplace = True)
+    discharge.rename(columns={'note_id':'NOTE_ID'}, inplace = True)
+elif args.note_type == 'radiology':
+    radiology = pd.read_csv('/data/datasets/mimiciv_notes/physionet.org/files/mimic-iv-note/2.2/note/radiology.csv')
+    radiology.rename(columns={'subject_id':'SUBJECT_ID'}, inplace = True)
+    radiology.rename(columns={'note_id':'NOTE_ID'}, inplace = True)
 notes_to_use = radiology if args.note_type == 'radiology' else discharge
 
 df_NOTES = []
@@ -182,13 +207,14 @@ for df in [mimic_iv_train, mimic_iv_test]:
     df_tmp['t_start_DT'] = df_tmp['INTIME'] + pd.to_timedelta(df_tmp['t_start'], unit='h')
 
     print(f"time {time() - tstart}: inserting note data by stay")
-    df_NOTE = df_tmp.groupby('ICUSTAY_ID', group_keys=True).progress_apply(_insert_note_data_by_stay)
+
+    df_NOTE = df_tmp.groupby('ICUSTAY_ID', group_keys=True).progress_apply(partial(_insert_note_data_by_stay, how=args.noteid_mode))
 
     print(f"time {time() - tstart}: populating time since note")
     df_NOTE = df_NOTE.progress_apply(_populate_time_since_note, axis=1)
 
-    print(f"time {time() - tstart}: merging text on NOTE_ID")
-    df_NOTE = df_NOTE.merge(notes_to_use[['NOTE_ID', 'text']], how = 'left', on = 'NOTE_ID')
+    # print(f"time {time() - tstart}: merging text on NOTE_ID") # FIXME move this down the pipeline
+    # df_NOTE = df_NOTE.merge(notes_to_use[['NOTE_ID', 'text']], how = 'left', on = 'NOTE_ID')
 
     df_NOTES.append(df_NOTE)
 
@@ -200,20 +226,21 @@ mimic_iv_test_NOTE.to_csv(out_testpath, index=False)
 print(f"wrote to {out_trainpath}")
 print(f"wrote to {out_testpath}")
 
-print(f"{out_trainpath} has {len(mimic_iv_train_NOTE['NOTE_ID'].unique())} unique NOTE_IDs")
-print(f"{out_testpath} has {len(mimic_iv_test_NOTE['NOTE_ID'].unique())} unique NOTE_IDs")
-
 
 if args.use_wandb:
     # wandb.login(key=os.getenv('WANDB_KEY_PERSONAL'), relogin = True)
-    wandb.login(key=os.getenv('WANDB_KEY_TAMU'), relogin = True)
+    # wandb.login(key=os.getenv('WANDB_KEY_TAMU'), relogin = True)
 
     log_artifact(artifact_path = out_trainpath,
-                  artifact_name = os.path.splitext(os.path.basename(out_trainpath))[0] + '.test' if args.test else '',
-                  project_name = os.getenv('WANDB_PROJECT_NAME'),
-                  do_filter=True,)
+                artifact_name = os.path.splitext(os.path.basename(out_trainpath))[0] + '.test' if args.test else '',
+                artifact_description = "MIMIC IV joined with note data for finetuning",
+                artifact_metadata= dict(args._get_kwargs()),
+                project_name = os.getenv('WANDB_PROJECT_NAME'),
+                do_filter=True,)
     
     log_artifact(artifact_path = out_testpath,
                 artifact_name = os.path.splitext(os.path.basename(out_testpath))[0] + '.test' if args.test else '',
+                artifact_description = "MIMIC IV joined with note data for finetuning",
+                artifact_metadata = dict(args._get_kwargs()),
                 project_name = os.getenv('WANDB_PROJECT_NAME'),
                 do_filter=True,)

@@ -109,28 +109,34 @@ def drop_ts(df : pd.DataFrame):
     df.drop(to_drop, axis = 1, inplace=True)
     return df
 
-def log_artifact(artifact_path, artifact_name, project_name, verbose = True, do_filter = True):
+def log_artifact(artifact_path, artifact_name, project_name, artifact_description = None, artifact_metadata = None, verbose = True, do_filter = False):
     df = pd.read_csv(artifact_path)
     if do_filter:
         drop_ts(df)
-    iris_table = wandb.Table(dataframe=df)
+    table = wandb.Table(dataframe=df)
 
     # Add the table to an Artifact to increase the row
     # limit to 200000 and make it easier to reuse
-    iris_table_artifact = wandb.Artifact(artifact_name, type="dataset")
-    iris_table_artifact.add(iris_table, "iris_table")
+    artifact = wandb.Artifact(artifact_name,
+                            type = "dataset",
+                            description = artifact_description,
+                            metadata = artifact_metadata,)
+    artifact.add(table, "iris_table")
 
-    iris_table_artifact.add_file(artifact_path)
+    artifact.add_file(artifact_path)
 
-    wandb.login(key=os.getenv('WANDB_KEY_TAMU'), relogin=True) # aa_ron_su
+    # wandb.login(key=os.getenv('WANDB_KEY_TAMU'), relogin=True) # aa_ron_su
+    wandb.login(key=os.getenv('WANDB_KEY_PERSONAL'), relogin=True) # aa_ron_su
     run = wandb.init(project=project_name)
 
     # Log the table to visualize with a run...
-    run.log({artifact_name: iris_table})
-    run.log_artifact(iris_table_artifact)
+    run.log({artifact_name: table})
+    run.log_artifact(artifact)
 
     if verbose:
         print(f"Loaded artifact {artifact_name} from {artifact_path}")
+
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
