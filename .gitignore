@@ -4,8 +4,9 @@ data_cache/*
 */data_cache/*
 logs/*
 logs_test/*
-wandb/*
+wandb
 old_data/*
+views
 
 Clinical-Longformer_out
 Clinical-Longformer_rad_out
