@@ -1,3 +1,12 @@
+import pandas as pd
+import argparse
+from time import time
+import os
+import wandb
+from tqdm.auto import tqdm
+from log_artifact import log_artifact
+tqdm.pandas()
+
 def generate_stay_and_note_timing_table(relevant_subjects, stays, notes):
     
     # filter for useful notes and stays data
@@ -111,12 +120,6 @@ def _populate_time_since_note(row):
     return row
 
 
-import pandas as pd
-import argparse
-from time import time
-import os
-from tqdm.auto import tqdm
-tqdm.pandas()
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--test', action='store_true', help='enable testing mode')
@@ -124,9 +127,7 @@ parser.add_argument('--note-type', dest = 'note_type', help='which notes, radiol
 parser.add_argument('--use-wandb', action = 'store_true', help = 'enable wandb', default=False)
 args = parser.parse_args()
 
-print(f"testing = {args.test}")
 assert(args.note_type == 'radiology' or args.note_type == 'discharge')
-
 
 trainpath = '/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_train.csv' #mimic_iv_train.csv'
 testpath = '/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_test.csv' #mimic_iv_test.csv'
@@ -172,7 +173,6 @@ for df in [mimic_iv_train, mimic_iv_test]:
     print(f"time {time() - tstart}: generating stay_note_timing_table")
     stay_note_timing = generate_stay_and_note_timing_table(relevant_subjects, all_stays, notes_to_use)
 
-    # df_tmp is populated with useful columns for our note merge.
     df_tmp = df.copy()
     df_tmp.rename(columns={'Icustay': 'ICUSTAY_ID'}, inplace = True) 
     print(f"time {time() - tstart}: merging INTIME on ICUSTAY_ID")
@@ -202,3 +202,18 @@ print(f"wrote to {out_testpath}")
 
 print(f"{out_trainpath} has {len(mimic_iv_train_NOTE['NOTE_ID'].unique())} unique NOTE_IDs")
 print(f"{out_testpath} has {len(mimic_iv_test_NOTE['NOTE_ID'].unique())} unique NOTE_IDs")
+
+
+if args.use_wandb:
+    # wandb.login(key=os.getenv('WANDB_KEY_PERSONAL'), relogin = True)
+    wandb.login(key=os.getenv('WANDB_KEY_TAMU'), relogin = True)
+
+    log_artifact(artifact_path = out_trainpath,
+                  artifact_name = os.path.splitext(os.path.basename(out_trainpath))[0] + '.test' if args.test else '',
+                  project_name = os.getenv('WANDB_PROJECT_NAME'),
+                  do_filter=True,)
+    
+    log_artifact(artifact_path = out_testpath,
+                artifact_name = os.path.splitext(os.path.basename(out_testpath))[0] + '.test' if args.test else '',
+                project_name = os.getenv('WANDB_PROJECT_NAME'),
+                do_filter=True,)
