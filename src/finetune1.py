@@ -39,35 +39,25 @@ required_arguments = ['GPU_NO', 'note_type', 'run_cntr', 'num_epochs', 'model_ty
 # Check if any of the required arguments are missing
 if any(arg not in args_list for arg in required_arguments):
     raise ValueError(f"One or more required arguments are missing from {required_arguments}")
-
-testing = args.test
-use_wandb = args.use_wandb
-GPU_NO = args.GPU_NO # this may be a single number or several ('1' or '1,2,3,4')
-note_type = args.note_type
-model_name = args.model_name
-model_type = args.model_type
-run_cntr = args.run_cntr
-num_epochs = int(args.num_epochs)
-ckpt_dir = args.ckpt_dir
-ckpt_model_path = args.ckpt_model_path
+args.num_epochs = int(args.num_epochs)
 
 print("finetune1.py args:")
 for arg in vars(args):
     print(f"\t{arg}: {getattr(args, arg)}")
 
-if use_wandb:
+if ags.use_wandb:
     # wandb.login(key=os.getenv('WANDB_KEY_PERSONAL'), relogin = True)
     wandb.login(key=os.getenv('WANDB_KEY_TAMU'), relogin = True)
 
-os.environ["CUDA_VISIBLE_DEVICES"] = GPU_NO
-os.environ["WANDB_DISABLED"] = f"{'true' if not use_wandb else 'false'}"
+os.environ["CUDA_VISIBLE_DEVICES"] = args.GPU_NO
+os.environ["WANDB_DISABLED"] = f"{'true' if not ags.use_wandb else 'false'}"
 
 root = '/home/ugrads/a/aa_ron_su/physionet.org/files/clinical-t5/1.0.0/'
 temivef_train_NOTE_TARGET1_FT_path = \
 f'/home/ugrads/a/aa_ron_su/JSS_SUBMISSION_NEW/\
 data/till_end_mimic_iv_extra_features_train_NOTE_TARGET1_FT\
-{"_rad" if note_type == "radiology" else ""}.csv'
-out_dir = f"{model_name}_{'rad' if note_type == 'radiology' else 'dis'}_{'test_' if testing else ''}out/{run_cntr}"
+{"_rad" if args.note_type == "radiology" else ""}.csv'
+out_dir = f"{args.model_name}_{'rad' if args.note_type == 'radiology' else 'dis'}_{'test_' if args.test else ''}out/{args.run_cntr}"
 assert(not os.path.exists(out_dir))
 
 # In[4]:
@@ -75,27 +65,27 @@ from transformers import AutoTokenizer, T5Config, AutoConfig, LongformerTokenize
 from T5EncoderForSequenceClassification import T5EncoderForSequenceClassification
 from ClinicalLongformerForSequenceClassification import ClinicalLongformerForSequenceClassification
 tokenizer, classifier = None, None
-if model_type == 'T5':
+if args.model_type == 'T5':
     from transformers import AutoModelForSeq2SeqLM, AutoModel
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name)
 
-    if ckpt_model_path:
-        classifier = torch.load(ckpt_model_path)
-        print('loaded model from ckpt model path:', ckpt_model_path)
+    if args.ckpt_model_path:
+        classifier = torch.load(args.ckpt_model_path)
+        print('loaded model from ckpt model path:', args.ckpt_model_path)
     else:
-        model = AutoModel.from_pretrained(model_name)
+        model = AutoModel.from_pretrained(args.model_name)
         encoder = model.get_encoder() # we only need the clinical-t5 encoder for our purposes
         config_new = encoder.config
         config_new.num_labels=2
         config_new.last_hidden_size=64
         classifier = T5EncoderForSequenceClassification(encoder, config_new)
 
-elif model_type == 'Longformer':
+elif args.model_type == 'Longformer':
     model_path = "yikuan8/Clinical-Longformer"
     tokenizer = LongformerTokenizerFast.from_pretrained(model_path)
-    if ckpt_model_path:
-        classifier = torch.load(ckpt_model_path)
-        print('loaded model from ckpt model path:', ckpt_model_path)
+    if args.ckpt_model_path:
+        classifier = torch.load(args.ckpt_model_path)
+        print('loaded model from ckpt model path:', args.ckpt_model_path)
     else:
         from transformers import AutoModel
         model = AutoModelForSequenceClassification.from_pretrained(model_path, num_labels = 2, gradient_checkpointing = True)
@@ -163,7 +153,7 @@ def do_tokenization(train : pd.DataFrame, train_idxs : List[int],
     train_data = train.iloc[train_idxs]
     val_data = train.iloc[val_idxs]
 
-    if testing:
+    if args.test:
         train_data = train_data.iloc[:500]
         val_data = val_data.iloc[:500]
 
@@ -222,7 +212,7 @@ def compute_metrics(pred) -> Dict[str, float]:
 # define the training arguments
 training_args = TrainingArguments(
     output_dir = f'{out_dir}/results',
-    num_train_epochs = num_epochs,
+    num_train_epochs = args.num_epochs,
     evaluation_strategy = "epoch",
     save_strategy="epoch",
     disable_tqdm = False, 
@@ -232,16 +222,16 @@ training_args = TrainingArguments(
     fp16 = True,
     logging_dir=f'{out_dir}/logs',
     dataloader_num_workers = 0,
-    run_name = f'{model_name}_{note_type}_run{run_cntr}',
+    run_name = f'{args.model_name}_{args.note_type}_run{args.run_cntr}',
 )
-if model_type == 'Longformer':
+if args.model_type == 'Longformer':
     training_args.learning_rate = 2e-5
     training_args.per_device_batch_size = 2
     training_args.gradient_accumulation_steps = 2 #3  # 8
     training_args.per_device_eval_batch_size = 4
     training_args.logging_steps = 4
     # training_args.fp16_backend="amp"    
-elif model_type == 'T5':
+elif args.model_type == 'T5':
     training_args.per_device_train_batch_size = 2 #5 # 2
     training_args.gradient_accumulation_steps = 8 #3  # 8
     training_args.per_device_eval_batch_size= 4 #10  # 4
@@ -266,15 +256,15 @@ trainer = MyTrainer(
     train_dataset=train_data,
     eval_dataset=val_data,
 )
-if ckpt_dir:
-    trainer._load_from_checkpoint(ckpt_dir)
-    print('loaded trainer from trainer ckpt dir:', ckpt_dir)
+if args.ckpt_dir:
+    trainer._load_from_checkpoint(args.ckpt_dir)
+    print('loaded trainer from trainer ckpt dir:', args.ckpt_dir)
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 # In[12]:
 
-if use_wandb:
-    resume = ckpt_dir != None
+if ags.use_wandb:
+    resume = args.ckpt_dir != None
     wandb.init(project='finetune llm', name=training_args.run_name, resume=resume)
     wandb.run.name = training_args.run_name
     print(wandb.run.get_url())
