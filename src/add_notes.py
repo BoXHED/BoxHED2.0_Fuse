@@ -2,6 +2,17 @@ def generate_stay_and_note_timing_table(relevant_subjects, stays, notes):
     
     # filter for useful notes and stays data
     def _filter_notes_and_stays(relevant_subjects, stays, notes):
+        '''
+        Get all NOTE_ID, SUBJECT_ID, and charttime from overall note data.
+        Get all SUBJECT_ID, ICUSTAY_ID, and INTIME from overall stay data.
+        Returns both dataframes.
+
+        Args:
+            relevant_subjects: all subjects in cohort (train or test), 
+                drawn from time series data
+            stays: icustay data -- from MIMIC IV 
+            notes: note data -- from MIMIC IV Note (Radiology or Discharge)
+        '''
         relevant_notes = notes[notes['SUBJECT_ID'].isin(relevant_subjects)]
         relevant_stays = stays[stays['SUBJECT_ID'].isin(relevant_subjects)]
 
@@ -11,6 +22,16 @@ def generate_stay_and_note_timing_table(relevant_subjects, stays, notes):
 
     # concatenate notes and stays, grouping by subject and sorting by DATETIME
     def _concat_and_sort_table(relevant_notes, relevant_stays):
+        '''
+        Time series alignment of notes and stays.
+
+        args:
+            relevant notes: df with cols ['SUBJECT_ID', 'NOTE_ID', 'charttime']
+            relevant_stays: df with cols ['SUBJECT_ID', 'ICUSTAY_ID', 'INTIME']
+
+        returns:
+            stay_note_timing: df with cols ['SUBJECT_ID', 'DATETIME', 'NOTE_ID', 'ICUSTAY_ID']
+        '''
         stay_note_timing = pd.concat([relevant_notes, relevant_stays]).sort_values(by='SUBJECT_ID')
         stay_note_timing['DATETIME'] = stay_note_timing['INTIME'].combine_first(stay_note_timing['charttime'])
         stay_note_timing.drop(['charttime'], axis=1, inplace=True)
@@ -20,43 +41,44 @@ def generate_stay_and_note_timing_table(relevant_subjects, stays, notes):
         return stay_note_timing
     
     def _fillna_icustay_by_subject(stay_note_timing_by_subject):
-        stay_note_timing_by_subject['ICUSTAY_ID'].fillna(method='ffill', inplace=True) # for all notes, fill icustay_id with the most recent icustay.
-        stay_note_timing_by_subject['ICUSTAY_ID'].fillna(method='bfill', inplace=True) # for all notes, fill icustay_id with the most recent icustay.        
+        '''
+        inputs:
+            stay_note_timing_by_stay: a subset of stay_note_timing for a single subject
+
+        for all rows with notes, fill forwards with the most recent ICUSTAY_ID, filling backwards if note predates ICUSTAY.
+        '''
+        stay_note_timing_by_subject['ICUSTAY_ID'].fillna(method='ffill', inplace=True) 
+        stay_note_timing_by_subject['ICUSTAY_ID'].fillna(method='bfill', inplace=True)   
         return stay_note_timing_by_subject
 
     
     def _fillna_intime_by_stay(stay_note_timing_by_stay):
+        '''
+        inputs:
+            stay_note_timing_by_stay: a subset of stay_note_timing for a single stay
+
+        for all rows with notes, fill forwards with the most recent INTIME, filling backwards if note predates ICUSTAY.
+        '''
         stay_note_timing_by_stay['INTIME'].fillna(method='ffill', inplace=True)
         stay_note_timing_by_stay['INTIME'].fillna(method='bfill', inplace=True)
         return stay_note_timing_by_stay
-    
-
-    def _populate_accum_timediff(stay_note_timing_by_subject):
-        first_intime = stay_note_timing_by_subject.iloc[0]['INTIME'] # first intime for this subject
-        stay_note_timing_by_subject['accum_timediff'] = stay_note_timing['DATETIME'] - first_intime
-        stay_note_timing_by_subject['accum_timediff'] = stay_note_timing_by_subject['accum_timediff'].apply(lambda x: x.total_seconds()/3600)
-        return stay_note_timing_by_subject
 
         
     relevant_notes, relevant_stays = _filter_notes_and_stays(relevant_subjects = relevant_subjects, stays = stays, notes = notes)
     stay_note_timing = _concat_and_sort_table(relevant_notes, relevant_stays)
-    # stay_note_timing.rename(columns={'note_id':'NOTE_ID'}, inplace=True)
 
     stay_note_timing = stay_note_timing.groupby('SUBJECT_ID', group_keys=True).apply(_fillna_icustay_by_subject)
     stay_note_timing = stay_note_timing.groupby('ICUSTAY_ID', group_keys=True).apply(_fillna_intime_by_stay)
     
     stay_note_timing['DATETIME'] = pd.to_datetime(stay_note_timing['DATETIME'])
     stay_note_timing['INTIME'] = pd.to_datetime(stay_note_timing['INTIME'])
-    # stay_note_timing['rel_timediff'] = (stay_note_timing['DATETIME'] - stay_note_timing['INTIME'])
-    # stay_note_timing['rel_timediff'] = stay_note_timing['rel_timediff'].apply(lambda x: x.total_seconds()/3600)
 
-    # stay_note_timing = stay_note_timing.groupby('SUBJECT_ID').apply(_populate_accum_timediff)
     stay_note_timing = stay_note_timing.convert_dtypes(infer_objects=True)
 
     return stay_note_timing
 
 def _insert_note_data_by_stay(mimic_iv_train_per_stay):
-    '''
+    ''' FIXME this needs to get ALL NOTES, not just most recent note.
     for time series data for a single icustay, populate most recent note id, returning None if there are no previous notes
 
     args:
@@ -91,22 +113,28 @@ def _populate_time_since_note(row):
 
 import pandas as pd
 import argparse
+from time import time
+import os
+from tqdm.auto import tqdm
+tqdm.pandas()
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--test', action='store_true', help='enable testing mode')
 parser.add_argument('--note-type', dest = 'note_type', help='which notes, radiology or discharge?')
+parser.add_argument('--use-wandb', action = 'store_true', help = 'enable wandb', default=False)
 args = parser.parse_args()
 
-testing = args.test
-print(f"testing = {testing}")
+print(f"testing = {args.test}")
 assert(args.note_type == 'radiology' or args.note_type == 'discharge')
 
 
-trainpath = '/home/ugrads/a/aa_ron_su/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_train.csv' #mimic_iv_train.csv'
-testpath = '/home/ugrads/a/aa_ron_su/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_test.csv' #mimic_iv_test.csv'
+trainpath = '/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_train.csv' #mimic_iv_train.csv'
+testpath = '/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_test.csv' #mimic_iv_test.csv'
 
-out_trainpath = f'/home/ugrads/a/aa_ron_su/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_train_NOTE_{args.note_type}.csv'# CHANGEME (rad for radiology, dis for discharge)
-out_testpath =  f'/home/ugrads/a/aa_ron_su/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_test_NOTE_{args.note_type}.csv'
+out_trainpath = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_train_NOTE_{args.note_type[:3]}.csv'
+out_testpath =  f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_test_NOTE_{args.note_type[:3]}.csv'
+assert os.path.exists(os.path.dirname(out_trainpath))
+assert os.path.exists(os.path.dirname(out_testpath))
 
 mimic_iv_train = pd.read_csv(trainpath)
 mimic_iv_test = pd.read_csv(testpath)
@@ -116,14 +144,14 @@ print(f"read from {testpath}")
 mimic_iv_train.rename(columns={'Icustay':'ICUSTAY_ID', 'subject':'SUBJECT_ID'}, inplace=True)
 mimic_iv_test.rename(columns={'Icustay':'ICUSTAY_ID', 'subject':'SUBJECT_ID'}, inplace=True)
 
-print(f"{trainpath} has {len(mimic_iv_train['ICUSTAY_ID'].unique())} unique Icustays")
-print(f"{testpath} has {len(mimic_iv_test['ICUSTAY_ID'].unique())} unique Icustays")
-
-if testing:
+if args.test:
     mimic_iv_train = mimic_iv_train.iloc[:2000]
     mimic_iv_test = mimic_iv_test.iloc[:2000]
 
-all_stays = pd.read_csv('/home/ugrads/a/aa_ron_su/JSS_SUBMISSION_NEW/tmp/all_stays.csv')
+    out_trainpath = os.path.join(os.path.dirname(out_trainpath), 'testing', os.path.basename(out_trainpath))
+    out_testpath = os.path.join(os.path.dirname(out_testpath), 'testing', os.path.basename(out_testpath))
+
+all_stays = pd.read_csv('/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION_NEW/tmp/all_stays.csv')
 
 discharge = pd.read_csv('/data/datasets/mimiciv_notes/physionet.org/files/mimic-iv-note/2.2/note/discharge.csv')
 discharge.rename(columns={'subject_id':'SUBJECT_ID'}, inplace = True)
@@ -135,15 +163,6 @@ radiology.rename(columns={'note_id':'NOTE_ID'}, inplace = True)
 
 notes_to_use = radiology if args.note_type == 'radiology' else discharge
 
-
-
-
-from tqdm.auto import tqdm
-tqdm.pandas()
-from time import time
-
-# add subject_id to mimic_iv_train
-# mimic_iv_train = mimic_iv_train_raw.merge(all_stays[['ICUSTAY_ID', 'SUBJECT_ID']], how='left', on='ICUSTAY_ID')
 df_NOTES = []
 
 tstart = time()

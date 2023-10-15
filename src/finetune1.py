@@ -3,7 +3,7 @@
 
 
 # In[1]:
-
+from typing import *
 import pandas as pd
 import os
 import torch.nn as nn
@@ -22,7 +22,7 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--test', action='store_true', help='enable testing mode')
-parser.add_argument('--use-wandb', action = 'store_true', help = 'enable wandb')
+parser.add_argument('--use-wandb', action = 'store_true', help = 'enable wandb', default=False)
 parser.add_argument('--gpu-no', dest = 'GPU_NO', help='use GPU_NO specified (this may be a single number or several. eg: 1 or 1,2,3,4)')
 parser.add_argument('--note-type', dest = 'note_type', help='which notes, radiology or discharge?')
 parser.add_argument('--model-name', dest = 'model_name', help='model to finetune. ex: "Clinical-T5-Base"')
@@ -56,8 +56,8 @@ for arg in vars(args):
     print(f"\t{arg}: {getattr(args, arg)}")
 
 if use_wandb:
-    wandb.login(key='2d62d7b2eea887cdb7783efd1978840a648f3fca') # suaaron
-    # wandb.login(key='7b5d4393e8517657a9e973ce0133b4ffbd97ad3d', relogin=True) # aa_ron_su
+    # wandb.login(key=os.getenv('WANDB_KEY_PERSONAL'), relogin = True)
+    wandb.login(key=os.getenv('WANDB_KEY_TAMU'), relogin = True)
 
 os.environ["CUDA_VISIBLE_DEVICES"] = GPU_NO
 os.environ["WANDB_DISABLED"] = f"{'true' if not use_wandb else 'false'}"
@@ -68,7 +68,7 @@ f'/home/ugrads/a/aa_ron_su/JSS_SUBMISSION_NEW/\
 data/till_end_mimic_iv_extra_features_train_NOTE_TARGET1_FT\
 {"_rad" if note_type == "radiology" else ""}.csv'
 out_dir = f"{model_name}_{'rad' if note_type == 'radiology' else 'dis'}_{'test_' if testing else ''}out/{run_cntr}"
-
+assert(not os.path.exists(out_dir))
 
 # In[4]:
 from transformers import AutoTokenizer, T5Config, AutoConfig, LongformerTokenizerFast, AutoModelForSequenceClassification, AutoModel, LongformerForSequenceClassification
@@ -77,7 +77,6 @@ from ClinicalLongformerForSequenceClassification import ClinicalLongformerForSeq
 tokenizer, classifier = None, None
 if model_type == 'T5':
     from transformers import AutoModelForSeq2SeqLM, AutoModel
-
     tokenizer = AutoTokenizer.from_pretrained(model_name)
 
     if ckpt_model_path:
@@ -116,7 +115,14 @@ train = pd.read_csv(temivef_train_NOTE_TARGET1_FT_path)
 print(f"reading notes and target from {temivef_train_NOTE_TARGET1_FT_path}")
 
 # In[6]:
-def group_train_test(ID):
+def group_train_test(ID : pd.Column) -> Tuple[List[int], List[int]]:
+    ''' Creates shuffled 80/20 split for train and test data using indices.
+    Args:
+        ID: a pandas column of indexes
+    
+    Returns:
+        A Tuple containing lists of indexes for train and test
+    '''
     ID             = ID.astype(int)
     ID_unique_srtd = np.unique(ID)
     np.random.seed(40)
@@ -132,7 +138,6 @@ def group_train_test(ID):
     assert(len(train) + len(val) == len(ID))
     assert(len(train_ids) + len(val_ids) == len(ID_unique_srtd))
     assert(len(train_ids) + len(val_ids) == len(ID_unique_srtd))
-
     return list(train.index), list(val.index)
 
 train_idxs, val_idxs = group_train_test(train['ICUSTAY_ID'])
@@ -140,47 +145,63 @@ train_idxs, val_idxs = group_train_test(train['ICUSTAY_ID'])
 
 
 from datasets import Dataset
-target = 'delta_in_2_days'
-train = train.rename(columns = {target:'label'})
 
-train_data = train.iloc[train_idxs]
-val_data = train.iloc[val_idxs]
+def do_tokenization(train : pd.DataFrame, train_idxs : List[int], 
+                    val_idxs : List[int]) -> Tuple[Dataset, Dataset]:
+    ''' Turns a train pandas dataset into 
+    Args:
+        train: pandas dataframe containing training note data and the associated target label
+        train_idxs: list of indexes for training data
+        val_idxs: list of indexes for validation data
+    
+    Returns:
+        A tuple of Datasets containing train and val data
+    '''
+    target = 'delta_in_2_days'
+    train = train.rename(columns = {target:'label'})
 
-if testing:
-    train_data = train_data.iloc[:500]
-    val_data = val_data.iloc[:500]
+    train_data = train.iloc[train_idxs]
+    val_data = train.iloc[val_idxs]
 
-train_data = Dataset.from_pandas(train_data).select_columns(['text', 'label'])
-val_data = Dataset.from_pandas(val_data).select_columns(['text', 'label'])
+    if testing:
+        train_data = train_data.iloc[:500]
+        val_data = val_data.iloc[:500]
 
-from functools import partial
-from helpers import tokenization
+    train_data = Dataset.from_pandas(train_data).select_columns(['text', 'label'])
+    val_data = Dataset.from_pandas(val_data).select_columns(['text', 'label'])
+
+    from functools import partial
+    from helpers import tokenization
 
 
-if not os.path.exists(f'{out_dir}/data_cache'):
-    # define a function that will tokenize the model, and will return the relevant inputs for the model
-    train_data = train_data.map(partial(tokenization, tokenizer, max_length=512), batched = True, batch_size = len(train_data) // 10)
-    val_data = val_data.map(partial(tokenization, tokenizer, max_length=512), batched = True, batch_size = len(val_data) // 10)
+    if not os.path.exists(f'{out_dir}/data_cache'):
+        # define a function that will tokenize the model, and will return the relevant inputs for the model
+        train_data = train_data.map(partial(tokenization, tokenizer, max_length=512), batched = True, batch_size = len(train_data) // 10)
+        val_data = val_data.map(partial(tokenization, tokenizer, max_length=512), batched = True, batch_size = len(val_data) // 10)
 
-    train_data.save_to_disk(f'{out_dir}/data_cache/tokenized_train_data')
-    val_data.save_to_disk(f'{out_dir}/data_cache/tokenized_val_data')
+        train_data.save_to_disk(f'{out_dir}/data_cache/tokenized_train_data')
+        val_data.save_to_disk(f'{out_dir}/data_cache/tokenized_val_data')
 
-else: 
-    print(f'loading train, val from', f'{out_dir}/data_cache/')
-    train_data = train_data.load_from_disk(f'{out_dir}/data_cache/tokenized_train_data')
-    val_data = val_data.load_from_disk(f'{out_dir}/data_cache/tokenized_val_data')
+    else: 
+        print(f'loading train, val from', f'{out_dir}/data_cache/')
+        train_data = train_data.load_from_disk(f'{out_dir}/data_cache/tokenized_train_data')
+        val_data = val_data.load_from_disk(f'{out_dir}/data_cache/tokenized_val_data')
 
-train_data.set_format('torch', columns=['input_ids', 'attention_mask', 'label'])
-val_data.set_format('torch', columns=['input_ids', 'attention_mask', 'label'])
+    train_data.set_format('torch', columns=['input_ids', 'attention_mask', 'label'])
+    val_data.set_format('torch', columns=['input_ids', 'attention_mask', 'label'])
+    train_data = train_data.remove_columns('text')
+    val_data = val_data.remove_columns('text')
 
-train_data = train_data.remove_columns('text')
-val_data = val_data.remove_columns('text')
+    return (train_data, val_data)
 
 # In[8]:
 
+train_data, val_data = do_tokenization(train, train_idxs, val_idxs)
 
 # define accuracy metrics
-def compute_metrics(pred):
+def compute_metrics(pred) -> Dict[str, float]:
+    ''' Uses prediction label_ids and predicttions to compute precision recall, accuracy and f1. 
+    '''
     labels = pred.label_ids
     preds = pred.predictions.argmax(-1)
     # argmax(pred.predictions, axis=1)

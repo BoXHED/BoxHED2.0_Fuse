@@ -1,7 +1,7 @@
 import os 
 
-def tokenization(tokenizer, batched_text, max_length):
-    return tokenizer(batched_text['text'], padding = 'max_length', truncation=True, 
+def tokenization(tokenizer, batched_text, max_length, truncation = True):
+    return tokenizer(batched_text['text'], padding = 'max_length', truncation=truncation, 
                         max_length = max_length)
 
 def find_and_create_next_index_dir(directory_path):
