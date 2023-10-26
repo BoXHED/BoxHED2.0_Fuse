@@ -1,16 +1,11 @@
-#!/usr/bin/env python
-# coding: utf-8
 
-
-# In[1]:
 from typing import *
 import pandas as pd
 import os
 import torch.nn as nn
 import pandas as pd
 from transformers import LongformerTokenizerFast, LongformerForSequenceClassification, Trainer, TrainingArguments, LongformerConfig, T5Config
-
-
+from datasets import Dataset
 import torch.nn as nn
 import torch
 from torch.utils.data import Dataset, DataLoader
@@ -20,88 +15,11 @@ import wandb
 import os
 import argparse
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--test', action='store_true', help='enable testing mode')
-parser.add_argument('--use-wandb', action = 'store_true', help = 'enable wandb', default=False)
-parser.add_argument('--gpu-no', dest = 'GPU_NO', help='use GPU_NO specified (this may be a single number or several. eg: 1 or 1,2,3,4)')
-parser.add_argument('--note-type', dest = 'note_type', help='which notes, radiology or discharge?')
-parser.add_argument('--model-name', dest = 'model_name', help='model to finetune. ex: "Clinical-T5-Base"')
-parser.add_argument('--model-type',  dest = 'model_type', help="T5 or LongFormer or Ckpt?")
-parser.add_argument('--run-cntr', dest = 'run_cntr', help = 'append this to dirname for storing additional runs')
-parser.add_argument('--num-epochs', dest = 'num_epochs', help = 'num_epochs to train')
-parser.add_argument('--ckpt-dir', dest = 'ckpt_dir', help = 'ckpt directory to load trainer from')
-parser.add_argument('--ckpt-model-path', dest = 'ckpt_model_path', help = 'ckpt path to load model from')
+# import sys
+# print(sys.path)
+# exit()
 
-args = parser.parse_args()
-
-args_list = [arg for arg in vars(args) if getattr(args, arg) is not None]
-required_arguments = ['GPU_NO', 'note_type', 'run_cntr', 'num_epochs', 'model_type', 'model_name']  # List of required arguments
-# Check if any of the required arguments are missing
-if any(arg not in args_list for arg in required_arguments):
-    raise ValueError(f"One or more required arguments are missing from {required_arguments}")
-args.num_epochs = int(args.num_epochs)
-
-print("finetune1.py args:")
-for arg in vars(args):
-    print(f"\t{arg}: {getattr(args, arg)}")
-
-os.environ["CUDA_VISIBLE_DEVICES"] = args.GPU_NO
-# os.environ["WANDB_DISABLED"] = f"{'true' if not args.use_wandb else 'false'}"
-
-root = '/home/ugrads/a/aa_ron_su/physionet.org/files/clinical-t5/1.0.0/'
-temivef_train_NOTE_TARGET1_FT_path = \
-f'/home/ugrads/a/aa_ron_su/JSS_SUBMISSION_NEW/\
-data/till_end_mimic_iv_extra_features_train_NOTE_TARGET1_FT\
-{"_rad" if args.note_type == "radiology" else ""}.csv'
-out_dir = f"{args.model_name}_{'rad' if args.note_type == 'radiology' else 'dis'}_{'test_' if args.test else ''}out/{args.run_cntr}"
-assert(not os.path.exists(out_dir))
-
-# In[4]:
-from transformers import AutoTokenizer, T5Config, AutoConfig, LongformerTokenizerFast, AutoModelForSequenceClassification, AutoModel, LongformerForSequenceClassification
-from T5EncoderForSequenceClassification import T5EncoderForSequenceClassification
-from ClinicalLongformerForSequenceClassification import ClinicalLongformerForSequenceClassification
-tokenizer, classifier = None, None
-if args.model_type == 'T5':
-    from transformers import AutoModelForSeq2SeqLM, AutoModel
-    tokenizer = AutoTokenizer.from_pretrained(args.model_name)
-
-    if args.ckpt_model_path:
-        classifier = torch.load(args.ckpt_model_path)
-        print('loaded model from ckpt model path:', args.ckpt_model_path)
-    else:
-        model = AutoModel.from_pretrained(args.model_name)
-        encoder = model.get_encoder() # we only need the clinical-t5 encoder for our purposes
-        config_new = encoder.config
-        config_new.num_labels=2
-        config_new.last_hidden_size=64
-        classifier = T5EncoderForSequenceClassification(encoder, config_new)
-
-elif args.model_type == 'Longformer':
-    model_path = "yikuan8/Clinical-Longformer"
-    tokenizer = LongformerTokenizerFast.from_pretrained(model_path)
-    if args.ckpt_model_path:
-        classifier = torch.load(args.ckpt_model_path)
-        print('loaded model from ckpt model path:', args.ckpt_model_path)
-    else:
-        from transformers import AutoModel
-        model = AutoModelForSequenceClassification.from_pretrained(model_path, num_labels = 2, gradient_checkpointing = True)
-        longformer = model.get_submodule('longformer')
-        config_new = longformer.config
-        config_new.num_labels=2
-        config_new.last_hidden_size=64
-        config_new.gradient_checkpointing=True
-        classifier = ClinicalLongformerForSequenceClassification(longformer, config_new)
-else:
-    print("incorrect model_type specified. Should be T5 or Longformer")
-    exit(1)
-
-# In[5]:
-
-train = pd.read_csv(temivef_train_NOTE_TARGET1_FT_path)
-print(f"reading notes and target from {temivef_train_NOTE_TARGET1_FT_path}")
-
-# In[6]:
-def group_train_test(ID : pd.Column) -> Tuple[List[int], List[int]]:
+def group_train_test(ID) -> Tuple[List[int], List[int]]:
     ''' Creates shuffled 80/20 split for train and test data using indices.
     Args:
         ID: a pandas column of indexes
@@ -126,11 +44,26 @@ def group_train_test(ID : pd.Column) -> Tuple[List[int], List[int]]:
     assert(len(train_ids) + len(val_ids) == len(ID_unique_srtd))
     return list(train.index), list(val.index)
 
-train_idxs, val_idxs = group_train_test(train['ICUSTAY_ID'])
-# In[7]:
 
 
-from datasets import Dataset
+# def load_text():
+#     '''
+#     given note_type, load_text by NOTE_ID. Load into notes_cohort
+
+#     Args:
+#         args.note_type: 'radiology' or 'discharge' used to load notes
+    
+#     Returns:
+#         pd.Column of text corresponding to NOTE_ID
+#     '''
+
+#     if args.note_type == 'radiology':
+#         all_notes = pd.read_csv('/data/datasets/mimiciv_notes/physionet.org/files/mimic-iv-note/2.2/note/radiology.csv')
+#     if args.note_type == 'discharge':
+#         all_notes = pd.read_csv('/data/datasets/mimiciv_notes/physionet.org/files/mimic-iv-note/2.2/note/discharge.csv')
+
+    
+    
 
 def do_tokenization(train : pd.DataFrame, train_idxs : List[int], 
                     val_idxs : List[int]) -> Tuple[Dataset, Dataset]:
@@ -148,10 +81,11 @@ def do_tokenization(train : pd.DataFrame, train_idxs : List[int],
 
     train_data = train.iloc[train_idxs]
     val_data = train.iloc[val_idxs]
+    breakpoint()
 
-    if args.test:
-        train_data = train_data.iloc[:500]
-        val_data = val_data.iloc[:500]
+    # if args.test:
+    #     train_data = train_data.iloc[:500]
+    #     val_data = val_data.iloc[:500]
 
     train_data = Dataset.from_pandas(train_data).select_columns(['text', 'label'])
     val_data = Dataset.from_pandas(val_data).select_columns(['text', 'label'])
@@ -180,11 +114,6 @@ def do_tokenization(train : pd.DataFrame, train_idxs : List[int],
 
     return (train_data, val_data)
 
-# In[8]:
-
-train_data, val_data = do_tokenization(train, train_idxs, val_idxs)
-
-# define accuracy metrics
 def compute_metrics(pred) -> Dict[str, float]:
     ''' Uses prediction label_ids and predicttions to compute precision recall, accuracy and f1. 
     '''
@@ -202,8 +131,96 @@ def compute_metrics(pred) -> Dict[str, float]:
     }
 
 
-# In[10]:
+parser = argparse.ArgumentParser()
+parser.add_argument('--test', action='store_true', help='enable testing mode')
+parser.add_argument('--use-wandb', action = 'store_true', help = 'enable wandb', default=False)
+parser.add_argument('--gpu-no', dest = 'GPU_NO', help='use GPU_NO specified (this may be a single number or several. eg: 1 or 1,2,3,4)')
+parser.add_argument('--note-type', dest = 'note_type', help='which notes, radiology or discharge?')
+parser.add_argument('--model-name', dest = 'model_name', help='model to finetune. ex: "Clinical-T5-Base"')
+parser.add_argument('--model-type',  dest = 'model_type', help="T5 or Longformer?")
+parser.add_argument('--run-cntr', dest = 'run_cntr', help = 'append this to dirname for storing additional runs')
+parser.add_argument('--num-epochs', dest = 'num_epochs', help = 'num_epochs to train')
+parser.add_argument('--ckpt-dir', dest = 'ckpt_dir', help = 'ckpt directory to load trainer from')
+parser.add_argument('--ckpt-model-path', dest = 'ckpt_model_path', help = 'ckpt path to load model from') # change this to artifact
+parser.add_argument('--noteid-mode', dest = 'noteid_mode', help = 'kw: all or recent')
+args = parser.parse_args()
+args.num_epochs = int(args.num_epochs)
 
+assert(args.note_type in  ['radiology', 'discharge'])
+assert(args.model_name in ['Clinical-T5-Base', 'Clinical-T5-Large', 'Clinical-T5-Sci', 'Clinical-T5-Scratch', 'yikuan8/Clinical-Longformer'])
+assert(args.model_type in ['T5', 'Longformer'])
+assert(args.noteid_mode in ['recent', 'all'])
+# assert(os.path.exists(args.ckpt_dir))
+# assert(os.path.exists(args.ckpt_model_path))
+
+print("finetune1.py args:")
+for arg in vars(args):
+    print(f"\t{arg}: {getattr(args, arg)}")
+
+os.environ["CUDA_VISIBLE_DEVICES"] = args.GPU_NO
+
+temivef_train_NOTE_TARGET1_FT_path = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/targets/till_end_mimic_iv_extra_features_train_NOTE_TARGET_2_{args.note_type[:3]}_{args.noteid_mode}.csv'
+
+out_dir = f"BoXHED_Fuse/model_outputs/{args.model_name}_{args.note_type[:3]}_{args.noteid_mode}_out/{args.run_cntr}"
+
+if args.test:
+    temivef_train_NOTE_TARGET1_FT_path = os.path.join(os.path.dirname(temivef_train_NOTE_TARGET1_FT_path), 'testing', os.path.basename(temivef_train_NOTE_TARGET1_FT_path))
+    out_dir = os.path.join(os.path.dirname(out_dir), 'testing', os.path.basename(out_dir))
+
+# assert(not os.path.exists(out_dir)) # comment this out for testing purposes
+if not os.path.exists(out_dir):
+    os.makedirs(out_dir)
+    print(f'created all dirs in out dir', out_dir)
+
+from transformers import AutoTokenizer, T5Config, AutoConfig, LongformerTokenizerFast, AutoModelForSequenceClassification, AutoModel, LongformerForSequenceClassification
+from BoXHED_Fuse.models.T5EncoderForSequenceClassification import T5EncoderForSequenceClassification
+from BoXHED_Fuse.models.ClinicalLongformerForSequenceClassification import ClinicalLongformerForSequenceClassification
+tokenizer, classifier = None, None
+if args.model_type == 'T5':
+    from transformers import AutoModelForSeq2SeqLM, AutoModel
+
+    model_dir = os.path.join('BoXHED_Fuse/models', args.model_name)
+    tokenizer = AutoTokenizer.from_pretrained(model_dir)
+    # tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+
+
+    if args.ckpt_model_path:
+        classifier = torch.load(args.ckpt_model_path)
+        print('loaded model from ckpt model path:', args.ckpt_model_path)
+    else:
+        model = AutoModel.from_pretrained(model_dir)
+        encoder = model.get_encoder() # we only need the clinical-t5 encoder for our purposes
+        config_new = encoder.config
+        config_new.num_labels=2
+        config_new.last_hidden_size=64
+        classifier = T5EncoderForSequenceClassification(encoder, config_new)
+
+elif args.model_type == 'Longformer':
+    model_path = "yikuan8/Clinical-Longformer"
+    tokenizer = LongformerTokenizerFast.from_pretrained(model_path)
+    if args.ckpt_model_path:
+        classifier = torch.load(args.ckpt_model_path)
+        print('loaded model from ckpt model path:', args.ckpt_model_path)
+    else:
+        from transformers import AutoModel
+        model = AutoModelForSequenceClassification.from_pretrained(model_path, num_labels = 2, gradient_checkpointing = True)
+        longformer = model.get_submodule('longformer')
+        config_new = longformer.config
+        config_new.num_labels=2
+        config_new.last_hidden_size=64
+        config_new.gradient_checkpointing=True
+        classifier = ClinicalLongformerForSequenceClassification(longformer, config_new)
+else:
+    print("incorrect model_type specified. Should be T5 or Longformer")
+    exit(1)
+
+train = pd.read_csv(temivef_train_NOTE_TARGET1_FT_path)
+if args.noteid_mode == 'all':
+    train = train.explode('NOTE_ID').drop_duplicates(subset='NOTE_ID')
+    
+print(f"reading notes and target from {temivef_train_NOTE_TARGET1_FT_path}")
+train_idxs, val_idxs = group_train_test(train['ICUSTAY_ID'])
+train_data, val_data = do_tokenization(train, train_idxs, val_idxs)
 
 # define the training arguments
 training_args = TrainingArguments(
@@ -253,12 +270,13 @@ if args.use_wandb:
     wandb.login(key=os.getenv('WANDB_KEY_TAMU'), relogin = True)
     
     resume = args.ckpt_dir != None
-    wandb.init(project='finetune llm', name=training_args.run_name, resume=resume)
+    wandb.init(project='BoXHED_Fuse', name=training_args.run_name, resume=resume)
     wandb.run.name = training_args.run_name
     print(wandb.run.get_url())
 
 trainer.train()
-# torch.save(trainer.best_model, f'{out_dir}/best_model.pt')
+# torch.save(trainer.best_model, f'{out_dir}/besls
+# t_model.pt')
 
 import logging
 logging.basicConfig(filename=f'{out_dir}/evaluation.log', level=logging.INFO, filemode='w')
@@ -268,4 +286,4 @@ logging.info(evaluation_result)
 best_checkpoint_path = trainer.state.best_model_checkpoint
 logging.info(f"best_checkpoint_path: {best_checkpoint_path}")
 
-print(f"RUN {training_args.run_name} FINISHED: check out_dir! {out_dir}")
+print(f"RUN {training_args.run_name} FINISHED. Out dir: {out_dir}")

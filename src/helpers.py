@@ -1,4 +1,5 @@
 import os 
+import ast
 
 def tokenization(tokenizer, batched_text, max_length, truncation = True):
     return tokenizer(batched_text['text'], padding = 'max_length', truncation=truncation, 
@@ -22,7 +23,8 @@ def find_and_create_next_index_dir(directory_path):
 
     return new_directory_path
 
-
+def convert_to_list(s):
+    return ast.literal_eval(s)
 
 
 

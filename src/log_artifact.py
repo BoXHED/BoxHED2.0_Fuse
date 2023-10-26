@@ -126,7 +126,7 @@ def log_artifact(artifact_path, artifact_name, project_name, artifact_descriptio
     artifact.add_file(artifact_path)
 
     # wandb.login(key=os.getenv('WANDB_KEY_TAMU'), relogin=True) # aa_ron_su
-    wandb.login(key=os.getenv('WANDB_KEY_PERSONAL'), relogin=True) # aa_ron_su
+    # wandb.login(key=os.getenv('WANDB_KEY_PERSONAL'), relogin=True) # aa_ron_su
     run = wandb.init(project=project_name)
 
     # Log the table to visualize with a run...

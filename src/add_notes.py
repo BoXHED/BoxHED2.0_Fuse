@@ -123,6 +123,7 @@ def _insert_note_data_by_stay(mimic_iv_train_per_stay, how = "recent"):
         mimic_iv_train_per_stay = mimic_iv_train_per_stay.apply(_populate_recent_note_id, axis=1)
     elif how == "all":
         mimic_iv_train_per_stay = mimic_iv_train_per_stay.apply(_populate_all_note_ids, axis=1)
+        
     return mimic_iv_train_per_stay
 
 def _populate_time_since_note(row):
@@ -157,8 +158,8 @@ assert(args.noteid_mode == 'all' or args.noteid_mode == 'recent')
 trainpath = '/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_train.csv' #mimic_iv_train.csv'
 testpath = '/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_test.csv' #mimic_iv_test.csv'
 
-out_trainpath = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_train_NOTE_{args.note_type[:3]}.csv'
-out_testpath =  f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_test_NOTE_{args.note_type[:3]}.csv'
+out_trainpath = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_train_NOTE_{args.note_type[:3]}_{args.noteid_mode}.csv'
+out_testpath =  f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_test_NOTE_{args.note_type[:3]}_{args.noteid_mode}.csv'
 assert os.path.exists(os.path.dirname(out_trainpath))
 assert os.path.exists(os.path.dirname(out_testpath))
 
@@ -229,7 +230,7 @@ print(f"wrote to {out_testpath}")
 
 if args.use_wandb:
     # wandb.login(key=os.getenv('WANDB_KEY_PERSONAL'), relogin = True)
-    # wandb.login(key=os.getenv('WANDB_KEY_TAMU'), relogin = True)
+    wandb.login(key=os.getenv('WANDB_KEY_TAMU'), relogin = True)
 
     log_artifact(artifact_path = out_trainpath,
                 artifact_name = os.path.splitext(os.path.basename(out_trainpath))[0] + '.test' if args.test else '',
