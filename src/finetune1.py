@@ -8,12 +8,21 @@ from transformers import LongformerTokenizerFast, LongformerForSequenceClassific
 from datasets import Dataset
 import torch.nn as nn
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import DataLoader
 import numpy as np
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 import wandb
 import os
 import argparse
+from functools import partial
+
+from BoXHED_Fuse.src.helpers import tokenization, convert_to_list
+
+'''
+EXAMPLE CALL:
+python -m BoXHED_Fuse.src.finetune1 --test --use-wandb --gpu-no 3 --note-type radiology --model-name Clinical-T5-Base --model-type T5 --run-cntr 1 --num-epochs 1 --noteid-mode all
+'''
+
 
 # import sys
 # print(sys.path)
@@ -44,27 +53,6 @@ def group_train_test(ID) -> Tuple[List[int], List[int]]:
     assert(len(train_ids) + len(val_ids) == len(ID_unique_srtd))
     return list(train.index), list(val.index)
 
-
-
-# def load_text():
-#     '''
-#     given note_type, load_text by NOTE_ID. Load into notes_cohort
-
-#     Args:
-#         args.note_type: 'radiology' or 'discharge' used to load notes
-    
-#     Returns:
-#         pd.Column of text corresponding to NOTE_ID
-#     '''
-
-#     if args.note_type == 'radiology':
-#         all_notes = pd.read_csv('/data/datasets/mimiciv_notes/physionet.org/files/mimic-iv-note/2.2/note/radiology.csv')
-#     if args.note_type == 'discharge':
-#         all_notes = pd.read_csv('/data/datasets/mimiciv_notes/physionet.org/files/mimic-iv-note/2.2/note/discharge.csv')
-
-    
-    
-
 def do_tokenization(train : pd.DataFrame, train_idxs : List[int], 
                     val_idxs : List[int]) -> Tuple[Dataset, Dataset]:
     ''' Turns a train pandas dataset into 
@@ -76,22 +64,18 @@ def do_tokenization(train : pd.DataFrame, train_idxs : List[int],
     Returns:
         A tuple of Datasets containing train and val data
     '''
-    target = 'delta_in_2_days'
-    train = train.rename(columns = {target:'label'})
+
 
     train_data = train.iloc[train_idxs]
     val_data = train.iloc[val_idxs]
-    breakpoint()
 
-    # if args.test:
-    #     train_data = train_data.iloc[:500]
-    #     val_data = val_data.iloc[:500]
+
+    # FIXME get text
 
     train_data = Dataset.from_pandas(train_data).select_columns(['text', 'label'])
     val_data = Dataset.from_pandas(val_data).select_columns(['text', 'label'])
 
-    from functools import partial
-    from helpers import tokenization
+
 
 
     if not os.path.exists(f'{out_dir}/data_cache'):
@@ -99,8 +83,11 @@ def do_tokenization(train : pd.DataFrame, train_idxs : List[int],
         train_data = train_data.map(partial(tokenization, tokenizer, max_length=512), batched = True, batch_size = len(train_data) // 10)
         val_data = val_data.map(partial(tokenization, tokenizer, max_length=512), batched = True, batch_size = len(val_data) // 10)
 
-        train_data.save_to_disk(f'{out_dir}/data_cache/tokenized_train_data')
-        val_data.save_to_disk(f'{out_dir}/data_cache/tokenized_val_data')
+        token_path_train = f'{out_dir}/data_cache/tokenized_train_data'
+        token_path_val = f'{out_dir}/data_cache/tokenized_val_data'
+        train_data.save_to_disk(token_path_train)
+        val_data.save_to_disk(token_path_val)
+        print(f'saved train, val tokens to {os.path.dirname(token_path_train)}')
 
     else: 
         print(f'loading train, val from', f'{out_dir}/data_cache/')
@@ -130,6 +117,17 @@ def compute_metrics(pred) -> Dict[str, float]:
         'recall': recall
     }
 
+def explode(train):
+    '''
+    explode train['NOTE_ID_SEQ'] for meta-finetuning
+    '''
+    positive_notes = train[train['label'] == 1]['NOTE_ID'].tolist()
+    train_sequences = pd.DataFrame(train[['ICUSTAY_ID', 'NOTE_ID_SEQ']].explode('NOTE_ID_SEQ').drop_duplicates())
+    train_sequences.rename(columns={'NOTE_ID_SEQ' : 'NOTE_ID'}, inplace=True)
+    train_sequences['label'] = train_sequences['NOTE_ID'].apply(lambda x: x in positive_notes)
+    train_sequences['label'].replace({True: 1, False: 0}, inplace=True)
+    train = train_sequences
+    return train
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--test', action='store_true', help='enable testing mode')
@@ -143,6 +141,7 @@ parser.add_argument('--num-epochs', dest = 'num_epochs', help = 'num_epochs to t
 parser.add_argument('--ckpt-dir', dest = 'ckpt_dir', help = 'ckpt directory to load trainer from')
 parser.add_argument('--ckpt-model-path', dest = 'ckpt_model_path', help = 'ckpt path to load model from') # change this to artifact
 parser.add_argument('--noteid-mode', dest = 'noteid_mode', help = 'kw: all or recent')
+# FIXME add target name functionality!!!
 args = parser.parse_args()
 args.num_epochs = int(args.num_epochs)
 
@@ -159,12 +158,12 @@ for arg in vars(args):
 
 os.environ["CUDA_VISIBLE_DEVICES"] = args.GPU_NO
 
-temivef_train_NOTE_TARGET1_FT_path = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/targets/till_end_mimic_iv_extra_features_train_NOTE_TARGET_2_{args.note_type[:3]}_{args.noteid_mode}.csv'
-
-out_dir = f"BoXHED_Fuse/model_outputs/{args.model_name}_{args.note_type[:3]}_{args.noteid_mode}_out/{args.run_cntr}"
+temivef_train_NOTE_TARGET1_path = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/targets/till_end_mimic_iv_extra_features_train_NOTE_TARGET_2_{args.note_type[:3]}_{args.noteid_mode}.csv'
+print(f'read from {temivef_train_NOTE_TARGET1_path}')
+out_dir = f"model_outputs/{args.model_name}_{args.note_type[:3]}_{args.noteid_mode}_out/{args.run_cntr}"
 
 if args.test:
-    temivef_train_NOTE_TARGET1_FT_path = os.path.join(os.path.dirname(temivef_train_NOTE_TARGET1_FT_path), 'testing', os.path.basename(temivef_train_NOTE_TARGET1_FT_path))
+    temivef_train_NOTE_TARGET1_path = os.path.join(os.path.dirname(temivef_train_NOTE_TARGET1_path), 'testing', os.path.basename(temivef_train_NOTE_TARGET1_path))
     out_dir = os.path.join(os.path.dirname(out_dir), 'testing', os.path.basename(out_dir))
 
 # assert(not os.path.exists(out_dir)) # comment this out for testing purposes
@@ -214,11 +213,26 @@ else:
     print("incorrect model_type specified. Should be T5 or Longformer")
     exit(1)
 
-train = pd.read_csv(temivef_train_NOTE_TARGET1_FT_path)
+print(f"reading notes and target from {temivef_train_NOTE_TARGET1_path}")
+train = pd.read_csv(temivef_train_NOTE_TARGET1_path, converters = {'NOTE_ID_SEQ': convert_to_list})
+target = 'delta_in_2_days'
+train = train.rename(columns = {target:'label'})
+
 if args.noteid_mode == 'all':
-    train = train.explode('NOTE_ID').drop_duplicates(subset='NOTE_ID')
-    
-print(f"reading notes and target from {temivef_train_NOTE_TARGET1_FT_path}")
+    print(f'noteid_mode {args.noteid_mode}: exploding NOTE_ID_SEQ')
+    train = explode(train)
+
+if args.note_type == 'radiology':
+    all_notes_path = '/data/datasets/mimiciv_notes/physionet.org/files/mimic-iv-note/2.2/note/radiology.csv'
+if args.note_type == 'discharge':
+    all_notes_path = '/data/datasets/mimiciv_notes/physionet.org/files/mimic-iv-note/2.2/note/discharge.csv'
+print(f"reading all notes from {all_notes_path}")
+all_notes = pd.read_csv(all_notes_path)
+all_notes.rename(columns={'note_id': 'NOTE_ID'}, inplace=True)
+
+# join train with all_notes
+train = pd.merge(train, all_notes[['NOTE_ID','text']], on='NOTE_ID', how='left')
+
 train_idxs, val_idxs = group_train_test(train['ICUSTAY_ID'])
 train_data, val_data = do_tokenization(train, train_idxs, val_idxs)
 
@@ -251,7 +265,7 @@ elif args.model_type == 'T5':
     training_args.logging_steps = 4
 
 # instantiate the trainer class and check for available devices
-from MyTrainer import MyTrainer
+from BoXHED_Fuse.src.MyTrainer import MyTrainer
 
 trainer = MyTrainer(
     model=classifier,

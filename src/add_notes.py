@@ -91,8 +91,9 @@ def generate_stay_and_note_timing_table(relevant_subjects, stays, notes):
     return stay_note_timing
 
 def _insert_note_data_by_stay(mimic_iv_train_per_stay, how = "recent"):
-    ''' FIXME this needs to get ALL NOTES, not just most recent note.
-    for time series data for a single icustay, populate most recent note id, returning None if there are no previous notes
+    '''
+    for time series data for a single icustay, populate most recent note id or a sequence of note ids,
+        returning None if there are no previous notes
 
     args:
         mimic_iv_train_per_stay: a dataframe containing time series data for a single icu stay
@@ -101,7 +102,7 @@ def _insert_note_data_by_stay(mimic_iv_train_per_stay, how = "recent"):
             if how = "all", gets all notes and stores them as a list.
     
     returns:
-        time series data with NOTE_ID in new column 'NOTE_ID'
+        time series data with NOTE_ID in new column 'NOTE_ID' and possibly a new column'NOTE_ID_SEQ' 
     '''
     def _populate_recent_note_id(row):
         stay_note_timing_for_subject = stay_note_timing[stay_note_timing['SUBJECT_ID'] == row['SUBJECT_ID']]
@@ -116,31 +117,33 @@ def _insert_note_data_by_stay(mimic_iv_train_per_stay, how = "recent"):
     def _populate_all_note_ids(row):
         stay_note_timing_for_subject = stay_note_timing[stay_note_timing['SUBJECT_ID'] == row['SUBJECT_ID']]
         prev_notes = stay_note_timing_for_subject[stay_note_timing_for_subject['DATETIME'] < row['t_start_DT']]['NOTE_ID']
-        row['NOTE_ID'] = prev_notes.tolist()
+        row['NOTE_ID_SEQ'] = prev_notes.tolist()
         return row
     
     if how == "recent":
         mimic_iv_train_per_stay = mimic_iv_train_per_stay.apply(_populate_recent_note_id, axis=1)
     elif how == "all":
+        mimic_iv_train_per_stay = mimic_iv_train_per_stay.apply(_populate_recent_note_id, axis=1)
         mimic_iv_train_per_stay = mimic_iv_train_per_stay.apply(_populate_all_note_ids, axis=1)
         
     return mimic_iv_train_per_stay
 
 def _populate_time_since_note(row):
-    if isinstance(row['NOTE_ID'], list):
-        if row['NOTE_ID'] == []:
-            row['time_since_note'] = None
-        else:
-            charttime = stay_note_timing[stay_note_timing['NOTE_ID'] == row['NOTE_ID'][-1]]['DATETIME']
-            time_since_note = (row['t_start_DT'] - charttime.iloc[0]).total_seconds()/3600
-            row['time_since_note'] = time_since_note
+    # if isinstance(row['NOTE_ID'], list):
+    #     if row['NOTE_ID'] == []:
+    #         row['time_since_note'] = None
+    #     else:
+    #         charttime = stay_note_timing[stay_note_timing['NOTE_ID'] == row['NOTE_ID'][-1]]['DATETIME']
+    #         time_since_note = (row['t_start_DT'] - charttime.iloc[0]).total_seconds()/3600
+    #         row['time_since_note'] = time_since_note
+    # else:
+
+    if pd.isna(row['NOTE_ID']):
+        row['time_since_note'] = None
     else:
-        if pd.isna(row['NOTE_ID']):
-            row['time_since_note'] = None
-        else:
-            charttime = stay_note_timing[stay_note_timing['NOTE_ID'] == row['NOTE_ID']]['DATETIME']
-            time_since_note = (row['t_start_DT'] - charttime.iloc[0]).total_seconds()/3600
-            row['time_since_note'] = time_since_note
+        charttime = stay_note_timing[stay_note_timing['NOTE_ID'] == row['NOTE_ID']]['DATETIME']
+        time_since_note = (row['t_start_DT'] - charttime.iloc[0]).total_seconds()/3600
+        row['time_since_note'] = time_since_note
     return row
 
 

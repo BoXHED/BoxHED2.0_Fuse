@@ -76,14 +76,14 @@ if args.test:
     outpath_ft_test = os.path.join(os.path.dirname(outpath_ft_test), 'testing', os.path.basename(outpath_ft_test))
 
 if args.noteid_mode == 'all':
-    train = pd.read_csv(train_path, converters = {'NOTE_ID': convert_to_list})
-    test = pd.read_csv(test_path, converters = {'NOTE_ID': convert_to_list})
+    train = pd.read_csv(train_path, converters = {'NOTE_ID_SEQ': convert_to_list})
+    test = pd.read_csv(test_path, converters = {'NOTE_ID_SEQ': convert_to_list})
 elif args.noteid_mode == "recent":
     train = pd.read_csv(train_path)
     test = pd.read_csv(test_path)
 
-assert(not os.path.exists(outpath_ft_train))
-assert(not os.path.exists(outpath_ft_test))
+# assert(not os.path.exists(outpath_ft_train))
+# assert(not os.path.exists(outpath_ft_test))
 
 for df in [train, test]:
     df['t_start_DT'] = pd.to_datetime(df['t_start_DT']) 
@@ -100,18 +100,18 @@ else:
     test = test.groupby('SUBJECT_ID').progress_apply(partial(_generate_target, target=target, target_label=target_label))
 
 train_note_target = train[['ICUSTAY_ID','NOTE_ID',target_label]].copy()
-train_note_target.dropna(inplace=True)
-train_note_target = train_note_target.drop_duplicates(subset='NOTE_ID')
-
 test_note_target = test[['ICUSTAY_ID','NOTE_ID',target_label]].copy()
-test_note_target.dropna(inplace=True)
-test_note_target = test_note_target.drop_duplicates(subset='NOTE_ID') # FIXME find all note ids from train and test
-
-
 if args.noteid_mode == 'all':
-    # breakpoint()
-    train_note_target = train_note_target[train_note_target.NOTE_ID.apply(len) > 0]
-    test_note_target = test_note_target[test_note_target.NOTE_ID.apply(len) > 0]
+    train_note_target['NOTE_ID_SEQ'] = train['NOTE_ID_SEQ'].copy()
+    test_note_target['NOTE_ID_SEQ'] = test['NOTE_ID_SEQ'].copy()
+
+
+train_note_target = train_note_target.drop_duplicates(subset='NOTE_ID').dropna()
+test_note_target = test_note_target.drop_duplicates(subset='NOTE_ID').dropna()
+
+# if args.noteid_mode == 'all':
+#     train_note_target = train_note_target[train_note_target.NOTE_ID.apply(len) > 0]
+#     test_note_target = test_note_target[test_note_target.NOTE_ID.apply(len) > 0]
 
 
 train_note_target.to_csv(outpath_ft_train, index=False)
