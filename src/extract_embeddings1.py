@@ -1,15 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[ ]:
-
-
-
-
-
-# In[18]:
-
-
 import os
 import torch
 import argparse
@@ -17,7 +5,7 @@ import pandas as pd
 import re
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--test', action='store_true', help='enable testing mode')
+parser.add_argument('--test', action='store_true', help='enable args.test mode')
 parser.add_argument('--gpu-no', dest = 'GPU_NO', help='use GPU_NO specified')
 parser.add_argument('--ckpt-dir', dest = 'ckpt_dir', help='FULL PATH of directory where model checkpoint is stored')
 parser.add_argument('--ckpt-model-name', dest = 'ckpt_model_name', help='directory where model checkpoint is stored')
@@ -25,46 +13,36 @@ parser.add_argument('--note-type', dest = 'note_type', help='which notes, radiol
 parser.add_argument('--model-name', dest = 'model_name')
 parser.add_argument('--model-type', dest = 'model_type', help = 'T5 or Longformer')
 parser.add_argument('--run-cntr', dest = 'run_cntr', help = 'appended to dirname for storing additional runs')
+parser.add_argument('--noteid-mode', dest = 'noteid_mode', help = 'kw: all or recent')
+
 args = parser.parse_args()
 
-args_list = [arg for arg in vars(args) if getattr(args, arg) is not None]
-print(args_list)
-required_arguments = ['GPU_NO', 'ckpt_model_name', 'ckpt_dir', 'note_type', 'run_cntr', 'model_name', 'model_type']  # List of required arguments
-# Check if any of the required arguments are missing
-missing_args = [arg for arg in required_arguments if arg not in args_list]
-if missing_args != []:
-    raise ValueError(f"Missing required arguments: {missing_args}")
+assert(args.note_type == 'radiology' or args.note_type == 'discharge')
+assert(args.model_type == 'T5' or args.model_type == 'Longformer')
+assert(args.noteid_mode == 'all' or args.noteid_mode == 'recent')
 
-testing = args.test
-GPU_NO = int(args.GPU_NO)
-ckpt_dir = args.ckpt_dir
-ckpt_model_name = args.ckpt_model_name
-note_type = args.note_type
-model_name = args.model_name
-model_type = args.model_type
-run_cntr = args.run_cntr
+args.GPU_NO = int(args.GPU_NO)
 
-print(f'joining {ckpt_dir} and {ckpt_model_name}')
-finetuned_model_path = os.path.join(ckpt_dir, ckpt_model_name)
+print(f'joining {args.ckpt_dir} and {args.ckpt_model_name}')
+finetuned_model_path = os.path.join(args.ckpt_dir, args.ckpt_model_name)
 print("extract_embeddings.py args:")
 for arg in vars(args):
     print(f"\t{arg}: {getattr(args, arg)}")
 
-os.environ["CUDA_VISIBLE_DEVICES"] = str(GPU_NO)  # use the correct gpu
+os.environ["CUDA_VISIBLE_DEVICES"] = str(args.GPU_NO)  # use the correct gpu
 device = torch.device(f'cuda' if torch.cuda.is_available() else 'cpu')
 print(f"device: {device}")
 
 # import torch.nn as nn
 # import sys
 
-root = '/home/ugrads/a/aa_ron_su/physionet.org/files/clinical-t5/1.0.0'
 # finetuned_model_path = root + '/model_from_ckpt1/meta_ft_classify.pt' # modify this line!
-temivef_train_NOTE_TARGET1_FT_path = f'/home/ugrads/a/aa_ron_su/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_train_NOTE_TARGET1_FT_{"rad" if note_type == "radiology" else ""}.csv'
-temivef_test_NOTE_TARGET1_FT_path = f'/home/ugrads/a/aa_ron_su/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_test_NOTE_TARGET1_FT_{"rad" if note_type == "radiology" else ""}.csv'
-temivef_train_NOTE_path = f'/home/ugrads/a/aa_ron_su/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_train_NOTE_{"rad" if note_type == "radiology" else ""}.csv'
-temivef_test_NOTE_path = f'/home/ugrads/a/aa_ron_su/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_test_NOTE_{"rad" if note_type == "radiology" else ""}.csv'
-epoch = re.findall(r'\d+', ckpt_model_name)[-1]
-outfolder = f"{model_name}_{'rad' if note_type == 'radiology' else 'dis'}_{'test_' if testing else ''}out/{run_cntr}/from_epoch{epoch}"
+temivef_train_NOTE_TARGET1_FT_path = f'/home/ugrads/a/aa_ron_su/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_train_NOTE_TARGET1_FT_{"rad" if args.note_type == "radiology" else ""}.csv'
+temivef_test_NOTE_TARGET1_FT_path = f'/home/ugrads/a/aa_ron_su/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_test_NOTE_TARGET1_FT_{"rad" if args.note_type == "radiology" else ""}.csv'
+temivef_train_NOTE_path = f'/home/ugrads/a/aa_ron_su/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_train_NOTE_{"rad" if args.note_type == "radiology" else ""}.csv'
+temivef_test_NOTE_path = f'/home/ugrads/a/aa_ron_su/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_test_NOTE_{"rad" if args.note_type == "radiology" else ""}.csv'
+epoch = re.findall(r'\d+', args.ckpt_model_name)[-1]
+outfolder = f"{args.model_name}_{'rad' if args.note_type == 'radiology' else 'dis'}_{'test_' if args.test else ''}out/{args.run_cntr}/from_epoch{epoch}"
 out_dir = f'/home/ugrads/a/aa_ron_su/JSS_SUBMISSION_NEW/data/final/{outfolder}/' # modify this line!
 
 train_outpath = os.path.join(out_dir, 'till_end_mimic_iv_extra_features_train.csv')
@@ -81,14 +59,11 @@ from functools import partial
 from transformers import LongformerTokenizerFast, AutoTokenizer
 
 tokenizer = None
-if model_type == 'T5':
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-elif model_type == 'Longformer':
+if args.model_type == 'T5':
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+elif args.model_type == 'Longformer':
     model_path = "yikuan8/Clinical-Longformer"
     tokenizer = LongformerTokenizerFast.from_pretrained(model_path)
-else:
-    print("incorrect model_type specified. Should be T5 or Longformer")
-    exit(1)
 assert(tokenizer != None)
 
 def df_to_tokens_ds(data):
@@ -113,10 +88,11 @@ print('tokenized notes converted back to dataframes for extraction...')
 classifier = torch.load(finetuned_model_path) 
 print(f'classifier loaded from {finetuned_model_path}, class is {classifier.__class__}')
 
-if testing:
+if args.test:
     tokenized_train_notes = tokenized_train_notes[:12]
     tokenized_test_notes = tokenized_test_notes[:12]
-    print(f"testing mode truncLated tokenized_notes to length {len(tokenized_train_notes)}")
+    print(f"args.test
+ mode truncLated tokenized_notes to length {len(tokenized_train_notes)}")
 
 
 from torch.utils.data import DataLoader, TensorDataset
