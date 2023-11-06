@@ -1,4 +1,5 @@
 import os 
+import pandas as pd
 import ast
 
 def tokenization(tokenizer, batched_text, max_length, truncation = True):
@@ -26,8 +27,14 @@ def find_and_create_next_index_dir(directory_path):
 def convert_to_list(s):
     return ast.literal_eval(s)
 
-
-
+def load_all_notes(note_type):
+    if note_type == 'radiology':
+        all_notes_path = '/data/datasets/mimiciv_notes/physionet.org/files/mimic-iv-note/2.2/note/radiology.csv'
+    if note_type == 'discharge':
+        all_notes_path = '/data/datasets/mimiciv_notes/physionet.org/files/mimic-iv-note/2.2/note/discharge.csv'
+    all_notes = pd.read_csv(all_notes_path)
+    all_notes.rename(columns={'note_id': 'NOTE_ID'}, inplace=True)
+    return all_notes
 
 
 

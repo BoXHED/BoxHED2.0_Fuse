@@ -1,6 +1,5 @@
 
 from typing import *
-import pandas as pd
 import os
 import torch.nn as nn
 import pandas as pd
@@ -222,13 +221,16 @@ if args.noteid_mode == 'all':
     print(f'noteid_mode {args.noteid_mode}: exploding NOTE_ID_SEQ')
     train = explode(train)
 
-if args.note_type == 'radiology':
-    all_notes_path = '/data/datasets/mimiciv_notes/physionet.org/files/mimic-iv-note/2.2/note/radiology.csv'
-if args.note_type == 'discharge':
-    all_notes_path = '/data/datasets/mimiciv_notes/physionet.org/files/mimic-iv-note/2.2/note/discharge.csv'
-print(f"reading all notes from {all_notes_path}")
-all_notes = pd.read_csv(all_notes_path)
-all_notes.rename(columns={'note_id': 'NOTE_ID'}, inplace=True)
+# if args.note_type == 'radiology':
+#     all_notes_path = '/data/datasets/mimiciv_notes/physionet.org/files/mimic-iv-note/2.2/note/radiology.csv'
+# if args.note_type == 'discharge':
+#     all_notes_path = '/data/datasets/mimiciv_notes/physionet.org/files/mimic-iv-note/2.2/note/discharge.csv'
+# print(f"reading all notes from {all_notes_path}")
+# all_notes = pd.read_csv(all_notes_path)
+# all_notes.rename(columns={'note_id': 'NOTE_ID'}, inplace=True)
+
+from BoXHED_Fuse.src.helpers import load_all_notes
+all_notes = load_all_notes(args.note_type)
 
 # join train with all_notes
 train = pd.merge(train, all_notes[['NOTE_ID','text']], on='NOTE_ID', how='left')
