@@ -2,11 +2,13 @@ import os
 import pandas as pd
 import ast
 
+
+
 def tokenization(tokenizer, batched_text, max_length, truncation = True):
     return tokenizer(batched_text['text'], padding = 'max_length', truncation=truncation, 
                         max_length = max_length)
 
-def find_and_create_next_index_dir(directory_path):
+def find_next_dir_index(directory_path):
     # Get a list of existing indices in the directory
     existing_indices = [name for name in os.listdir(directory_path) if os.path.isdir(os.path.join(directory_path, name))]
 
@@ -18,11 +20,7 @@ def find_and_create_next_index_dir(directory_path):
         next_index = 0
 
     # Create a new directory with the next index
-    new_directory_name = str(next_index)
-    new_directory_path = os.path.join(directory_path, new_directory_name)
-    os.mkdir(new_directory_path)
-
-    return new_directory_path
+    return next_index
 
 def convert_to_list(s):
     return ast.literal_eval(s)
@@ -40,8 +38,7 @@ def load_all_notes(note_type):
 
 
 if __name__ == '__main__':
-    new_dir = (find_and_create_next_index_dir('../model_outputs/Clinical-T5-Base_rad_out'))
+    new_dir = (find_next_dir_index('../model_outputs/Clinical-T5-Base_rad_out'))
     print(new_dir)
-    os.rmdir(new_dir)
 
     

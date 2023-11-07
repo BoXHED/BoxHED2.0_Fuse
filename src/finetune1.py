@@ -15,7 +15,8 @@ import os
 import argparse
 from functools import partial
 
-from BoXHED_Fuse.src.helpers import tokenization, convert_to_list
+from BoXHED_Fuse.src.helpers import tokenization, convert_to_list, find_next_dir_index, load_all_notes
+
 
 '''
 EXAMPLE CALL:
@@ -77,21 +78,21 @@ def do_tokenization(train : pd.DataFrame, train_idxs : List[int],
 
 
 
-    if not os.path.exists(f'{out_dir}/data_cache'):
+    if not os.path.exists(f'{model_out_dir}/data_cache'):
         # define a function that will tokenize the model, and will return the relevant inputs for the model
         train_data = train_data.map(partial(tokenization, tokenizer, max_length=512), batched = True, batch_size = len(train_data) // 10)
         val_data = val_data.map(partial(tokenization, tokenizer, max_length=512), batched = True, batch_size = len(val_data) // 10)
 
-        token_path_train = f'{out_dir}/data_cache/tokenized_train_data'
-        token_path_val = f'{out_dir}/data_cache/tokenized_val_data'
+        token_path_train = f'{model_out_dir}/data_cache/tokenized_train_data'
+        token_path_val = f'{model_out_dir}/data_cache/tokenized_val_data'
         train_data.save_to_disk(token_path_train)
         val_data.save_to_disk(token_path_val)
         print(f'saved train, val tokens to {os.path.dirname(token_path_train)}')
 
     else: 
-        print(f'loading train, val from', f'{out_dir}/data_cache/')
-        train_data = train_data.load_from_disk(f'{out_dir}/data_cache/tokenized_train_data')
-        val_data = val_data.load_from_disk(f'{out_dir}/data_cache/tokenized_val_data')
+        print(f'loading train, val from', f'{model_out_dir}/data_cache/')
+        train_data = train_data.load_from_disk(f'{model_out_dir}/data_cache/tokenized_train_data')
+        val_data = val_data.load_from_disk(f'{model_out_dir}/data_cache/tokenized_val_data')
 
     train_data.set_format('torch', columns=['input_ids', 'attention_mask', 'label'])
     val_data.set_format('torch', columns=['input_ids', 'attention_mask', 'label'])
@@ -157,18 +158,18 @@ for arg in vars(args):
 
 os.environ["CUDA_VISIBLE_DEVICES"] = args.GPU_NO
 
-temivef_train_NOTE_TARGET1_path = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/targets/till_end_mimic_iv_extra_features_train_NOTE_TARGET_2_{args.note_type[:3]}_{args.noteid_mode}.csv'
-print(f'read from {temivef_train_NOTE_TARGET1_path}')
-out_dir = f"model_outputs/{args.model_name}_{args.note_type[:3]}_{args.noteid_mode}_out/{args.run_cntr}"
+train_path = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/targets/till_end_mimic_iv_extra_features_train_NOTE_TARGET_2_{args.note_type[:3]}_{args.noteid_mode}.csv'
+print(f'read from {train_path}')
+model_out_dir = f"model_outputs/{args.model_name}_{args.note_type[:3]}_{args.noteid_mode}_out/{args.run_cntr}"
 
 if args.test:
-    temivef_train_NOTE_TARGET1_path = os.path.join(os.path.dirname(temivef_train_NOTE_TARGET1_path), 'testing', os.path.basename(temivef_train_NOTE_TARGET1_path))
-    out_dir = os.path.join(os.path.dirname(out_dir), 'testing', os.path.basename(out_dir))
+    train_path = os.path.join(os.path.dirname(train_path), 'testing', os.path.basename(train_path))
+    model_out_dir = os.path.join(os.path.dirname(model_out_dir), 'testing', os.path.basename(model_out_dir))
 
 # assert(not os.path.exists(out_dir)) # comment this out for testing purposes
-if not os.path.exists(out_dir):
-    os.makedirs(out_dir)
-    print(f'created all dirs in out dir', out_dir)
+if not os.path.exists(model_out_dir):
+    os.makedirs(model_out_dir)
+    print(f'created all dirs in model_out_dir', model_out_dir)
 
 from transformers import AutoTokenizer, T5Config, AutoConfig, LongformerTokenizerFast, AutoModelForSequenceClassification, AutoModel, LongformerForSequenceClassification
 from BoXHED_Fuse.models.T5EncoderForSequenceClassification import T5EncoderForSequenceClassification
@@ -212,8 +213,8 @@ else:
     print("incorrect model_type specified. Should be T5 or Longformer")
     exit(1)
 
-print(f"reading notes and target from {temivef_train_NOTE_TARGET1_path}")
-train = pd.read_csv(temivef_train_NOTE_TARGET1_path, converters = {'NOTE_ID_SEQ': convert_to_list})
+print(f"reading notes and target from {train_path}")
+train = pd.read_csv(train_path, converters = {'NOTE_ID_SEQ': convert_to_list})
 target = 'delta_in_2_days'
 train = train.rename(columns = {target:'label'})
 
@@ -229,7 +230,6 @@ if args.noteid_mode == 'all':
 # all_notes = pd.read_csv(all_notes_path)
 # all_notes.rename(columns={'note_id': 'NOTE_ID'}, inplace=True)
 
-from BoXHED_Fuse.src.helpers import load_all_notes
 all_notes = load_all_notes(args.note_type)
 
 # join train with all_notes
@@ -240,7 +240,7 @@ train_data, val_data = do_tokenization(train, train_idxs, val_idxs)
 
 # define the training arguments
 training_args = TrainingArguments(
-    output_dir = f'{out_dir}/results',
+    output_dir = f'{model_out_dir}/results',
     num_train_epochs = args.num_epochs,
     evaluation_strategy = "epoch",
     save_strategy="epoch",
@@ -249,7 +249,7 @@ training_args = TrainingArguments(
     warmup_steps=200,
     weight_decay=0.01,
     fp16 = True,
-    logging_dir=f'{out_dir}/logs',
+    logging_dir=f'{model_out_dir}/logs',
     dataloader_num_workers = 0,
     run_name = f'{args.model_name}_{args.note_type}_run{args.run_cntr}',
 )
@@ -295,11 +295,11 @@ trainer.train()
 # t_model.pt')
 
 import logging
-logging.basicConfig(filename=f'{out_dir}/evaluation.log', level=logging.INFO, filemode='w')
+logging.basicConfig(filename=f'{model_out_dir}/evaluation.log', level=logging.INFO, filemode='w')
 evaluation_result = trainer.evaluate()
 logging.info(evaluation_result)
 
 best_checkpoint_path = trainer.state.best_model_checkpoint
 logging.info(f"best_checkpoint_path: {best_checkpoint_path}")
 
-print(f"RUN {training_args.run_name} FINISHED. Out dir: {out_dir}")
+print(f"RUN {training_args.run_name} FINISHED. Out dir: {model_out_dir}")
