@@ -23,7 +23,7 @@ def df_to_tokens_ds(data):
     abel
     '''
     data = Dataset.from_pandas(data).select_columns(['text', 'label'])
-    data = data.map(partial(tokenization, tokenizer, max_length=512), batched = True, batch_size = len(train_data) // 10) # def tokenization(tokenizer, batched_text, max_length):
+    data = data.map(partial(tokenization, tokenizer, max_length=512), batched = True, batch_size = len(data) // 10) # def tokenization(tokenizer, batched_text, max_length):
     data = data.remove_columns('text')
     return data
 
@@ -118,19 +118,19 @@ if __name__ == '__main__':
     print(f"device: {device}")
 
     # finetuned_model_path = root + '/model_from_ckpt1/meta_ft_classify.pt' # modify this line!
-    temivef_train_NOTE_TARGET_path = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/targets/till_end_mimic_iv_extra_features_train_NOTE_TARGET_2_{args.note_type[:3]}_{args.noteid_mode}.csv'
-    temivef_test_NOTE_TARGET_path = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/targets/till_end_mimic_iv_extra_features_test_NOTE_TARGET_2_{args.note_type[:3]}_{args.noteid_mode}.csv'
-    temivef_train_NOTE_path = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_train_NOTE_{args.note_type[:3]}_{args.noteid_mode}.csv'
-    temivef_test_NOTE_path = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_test_NOTE_{args.note_type[:3]}_{args.noteid_mode}.csv'
+    train_NOTE_TARGET_path = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/targets/till_end_mimic_iv_extra_features_train_NOTE_TARGET_2_{args.note_type[:3]}_{args.noteid_mode}.csv'
+    test_NOTE_TARGET_path = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/targets/till_end_mimic_iv_extra_features_test_NOTE_TARGET_2_{args.note_type[:3]}_{args.noteid_mode}.csv'
+    train_NOTE_path = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_train_NOTE_{args.note_type[:3]}_{args.noteid_mode}.csv'
+    test_NOTE_path = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_test_NOTE_{args.note_type[:3]}_{args.noteid_mode}.csv'
     epoch = re.findall(r'\d+', args.ckpt_model_name)[-1]
-    outfolder = f"{args.model_name}_{args.note_type[:3]}_{'test_' if args.test else ''}out/{args.run_cntr}/from_epoch{epoch}"
+    outfolder = f"{args.model_name}_{args.note_type[:3]}_out/{args.run_cntr}/from_epoch{epoch}"
     out_dir = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/final/{outfolder}'
 
     if args.test:
-        temivef_train_NOTE_TARGET_path = os.path.join(os.path.dirname(temivef_train_NOTE_TARGET_path), 'testing', os.path.basename(temivef_train_NOTE_TARGET_path))
-        temivef_test_NOTE_TARGET_path = os.path.join(os.path.dirname(temivef_test_NOTE_TARGET_path), 'testing', os.path.basename(temivef_test_NOTE_TARGET_path))
-        temivef_train_NOTE_path = os.path.join(os.path.dirname(temivef_train_NOTE_path), 'testing', os.path.basename(temivef_train_NOTE_path))
-        temivef_test_NOTE_path = os.path.join(os.path.dirname(temivef_test_NOTE_path), 'testing', os.path.basename(temivef_test_NOTE_path))
+        train_NOTE_TARGET_path = os.path.join(os.path.dirname(train_NOTE_TARGET_path), 'testing', os.path.basename(train_NOTE_TARGET_path))
+        test_NOTE_TARGET_path = os.path.join(os.path.dirname(test_NOTE_TARGET_path), 'testing', os.path.basename(test_NOTE_TARGET_path))
+        train_NOTE_path = os.path.join(os.path.dirname(train_NOTE_path), 'testing', os.path.basename(train_NOTE_path))
+        test_NOTE_path = os.path.join(os.path.dirname(test_NOTE_path), 'testing', os.path.basename(test_NOTE_path))
         out_dir = os.path.join(os.path.dirname(out_dir), 'testing', os.path.basename(out_dir))
 
     train_outpath = os.path.join(out_dir, 'till_end_mimic_iv_extra_features_train.csv')
@@ -151,8 +151,8 @@ if __name__ == '__main__':
 
 
     target = 'delta_in_2_days'
-    train_data = pd.read_csv(temivef_train_NOTE_TARGET_path).rename(columns = {target:'label'})
-    test_data = pd.read_csv(temivef_test_NOTE_TARGET_path).rename(columns = {target:'label'})
+    train_data = pd.read_csv(train_NOTE_TARGET_path).rename(columns = {target:'label'})
+    test_data = pd.read_csv(test_NOTE_TARGET_path).rename(columns = {target:'label'})
 
     train_data = merge_text(train_data)
     test_data = merge_text(test_data)
@@ -167,11 +167,6 @@ if __name__ == '__main__':
 
     classifier = torch.load(finetuned_model_path) 
     print(f'classifier loaded from {finetuned_model_path}, class is {classifier.__class__}')
-
-    if args.test:
-        tokenized_train_notes = tokenized_train_notes[:12]
-        tokenized_test_notes = tokenized_test_notes[:12]
-        print(f"args.test mode truncated tokenized_notes to length {len(tokenized_train_notes)}")
 
 
     # train_data.set_format('torch', columns=['input_ids', 'attention_mask', 'label']) # FIXME this is more elegant...
@@ -198,24 +193,12 @@ if __name__ == '__main__':
     test_embeddings_df = extract_embeddings(test_dataloader, classifier)
     print("finished test embedding extraction")
 
-    # for step, batch in enumerate(train_dataloader):
-    #     # Assuming each batch consists of input_ids, attention_mask, and labels
-    #     input_ids, attention_mask = batch
-
-    #     # Print or examine the data in each batch
-    #     print('step:', step)
-    #     print('Input IDs:', input_ids)
-    #     print('Attention Mask:', attention_mask)
-
-    #     print('---')
-
-
-    print(f"reading from", temivef_train_NOTE_TARGET_path)
-    print(f"reading from", temivef_test_NOTE_TARGET_path)
-    train = pd.read_csv(temivef_train_NOTE_TARGET_path)
-    test = pd.read_csv(temivef_test_NOTE_TARGET_path)
-    print(f"loaded train notes to extract from {temivef_train_NOTE_TARGET_path}")
-    print(f"loaded test notes to extract from {temivef_test_NOTE_TARGET_path}")
+    print("reading from", train_NOTE_TARGET_path)
+    print("reading from", test_NOTE_TARGET_path)
+    train = pd.read_csv(train_NOTE_TARGET_path)
+    test = pd.read_csv(test_NOTE_TARGET_path)
+    print(f"loaded train notes to extract from {train_NOTE_TARGET_path}")
+    print(f"loaded test notes to extract from {test_NOTE_TARGET_path}")
 
     #concat notes with ICUSTAY column for merging later
     train_df_small = pd.concat([train[['ICUSTAY_ID', 'NOTE_ID']], train_embeddings_df], axis = 1)
@@ -226,23 +209,19 @@ if __name__ == '__main__':
 
     for mode in ["train", "test"]:
         print(f"reading from temivef_{mode}_NOTE_path")
-    train_df_big = pd.read_csv(temivef_train_NOTE_path)
-    test_df_big = pd.read_csv(temivef_test_NOTE_path)
-    breakpoint()
+    train_df_big = pd.read_csv(train_NOTE_path)
+    test_df_big = pd.read_csv(test_NOTE_path)
     train_df_big = merge_text(train_df_big)
     test_df_big = merge_text(test_df_big)
-    print(f"loaded train df to merge with data from {temivef_train_NOTE_path}")
-    print(f"loaded test notes to merge with data from {temivef_test_NOTE_path}")
-    breakpoint()
+    print(f"loaded train df to merge with data from {train_NOTE_path}")
+    print(f"loaded test notes to merge with data from {test_NOTE_path}")
     print("merging and filling embeddings...")
     train_out_df = merge_and_fill_embeddings(train_df_small, train_df_big)
     print("merged and filled embeddings for train_out_df")
     test_out_df = merge_and_fill_embeddings(test_df_small, test_df_big)
     print("merged and filled embeddings for test_out_df")
-    breakpoint()
     train_out_df = format_cols(train_out_df)
     test_out_df = format_cols(test_out_df)
-
     train_out_df.to_csv(train_outpath, index = False)
     print("wrote to", train_outpath)
     test_out_df.to_csv(test_outpath, index = False)

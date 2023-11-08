@@ -174,6 +174,10 @@ print(f"read from {testpath}")
 mimic_iv_train.rename(columns={'Icustay':'ICUSTAY_ID', 'subject':'SUBJECT_ID'}, inplace=True)
 mimic_iv_test.rename(columns={'Icustay':'ICUSTAY_ID', 'subject':'SUBJECT_ID'}, inplace=True)
 
+
+mimic_iv_train = mimic_iv_train[['ICUSTAY_ID', 'SUBJECT_ID', 't_start', 't_end', 'delta']]
+mimic_iv_test = mimic_iv_test[['ICUSTAY_ID', 'SUBJECT_ID', 't_start', 't_end', 'Y', 'delta']]
+
 if args.test:
     mimic_iv_train = mimic_iv_train.iloc[:2000]
     mimic_iv_test = mimic_iv_test.iloc[:2000]

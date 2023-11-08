@@ -9,12 +9,17 @@ def tokenization(tokenizer, batched_text, max_length, truncation = True):
                         max_length = max_length)
 
 def find_next_dir_index(directory_path):
+    def safe_string_to_int(s):
+        try:
+            return int(s)
+        except ValueError:
+            return 0
     # Get a list of existing indices in the directory
     existing_indices = [name for name in os.listdir(directory_path) if os.path.isdir(os.path.join(directory_path, name))]
 
     # Find the maximum index if there are existing indices
     if existing_indices:
-        max_index = max([int(index) for index in existing_indices])
+        max_index = max([safe_string_to_int(index) for index in existing_indices])
         next_index = max_index + 1
     else:
         next_index = 0
