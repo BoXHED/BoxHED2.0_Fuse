@@ -12,15 +12,13 @@ import wandb
 import argparse
 from functools import partial
 
-# FIXME import below need path from root
-from BoXHED_Fuse.src.helpers import find_next_dir_index 
+from BoXHED_Fuse.src.helpers import find_next_dir_index, explode_train_target, merge_embs_to_seq, convert_to_list
 from BoXHED_Fuse.src.MyTrainer import MyTrainer 
 from BoXHED_Fuse.models.ClinicalLSTM import ClinicalLSTM
 
 
 if __name__ == '__main__':
-
-    # ===== Initialize Args ===== 
+    # ===== Initialize Args =====   
     parser = argparse.ArgumentParser()
     parser.add_argument('--test', action='store_true', help='enable testing mode')
     parser.add_argument('--use-wandb', action = 'store_true', help = 'enable wandb', default=False)
@@ -31,9 +29,10 @@ if __name__ == '__main__':
     args = parser.parse_args()
     args.num_epochs = int(args.num_epochs)
 
-    train_embs_path = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/embs/till_end_mimic_iv_extra_features_train_NOTE_TARGET_2_embs_{args.note_type[:3]}_{args.noteid_mode}.csv'
+    model_name_ft1 = 'Clinical-T5-Base'# FIXME add this as an arg
+    train_target_path = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/targets/till_end_mimic_iv_extra_features_train_NOTE_TARGET_2_{args.note_type[:3]}_{args.noteid_mode}.csv'
+    train_embs_path =   f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/embs{"/testing" if args.test else ""}/{model_name_ft1}_{args.note_type[:3]}_{args.noteid_mode}_out/from_epoch1/1/train_embs.pt'
     model_name = 'clinical_lstm'
-
     model_out_dir = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/model_outputs/{model_name}_{args.note_type[:3]}_{args.noteid_mode}_out'
     if not os.path.exists(model_out_dir):
         os.makedirs(model_out_dir)
@@ -44,11 +43,16 @@ if __name__ == '__main__':
     print(f'created all dirs in model_out_dir', model_out_dir)
 
     if args.test:
-        train_embs_path = os.path.join(os.path.dirname(train_embs_path), 'testing', os.path.basename(train_embs_path))
+        train_target_path = os.path.join(os.path.dirname(train_target_path), 'testing', os.path.basename(train_target_path)) 
         model_out_dir = os.path.join(os.path.dirname(model_out_dir), 'testing', os.path.basename(model_out_dir))
 
     # ===== Read Data =====
-    # train_embs = pd.read_csv(train_embs_path)
+    train_embs = torch.load(train_embs_path)
+    train_target = pd.read_csv(train_target_path, converters = {'NOTE_ID_SEQ': convert_to_list})
+
+    # ===== Merge data into {note_embs_seq, label}, where note_seq is a list of embs =====
+    train_embs_seq = merge_embs_to_seq(train_embs, train_target)
+
 
     # ===== Train LSTM ===== 
     # clin_lstm = ClinicalLSTM()
@@ -67,3 +71,5 @@ if __name__ == '__main__':
     # extract_emb_seq()
 
     # ===== Validate =====
+
+    breakpoint()    

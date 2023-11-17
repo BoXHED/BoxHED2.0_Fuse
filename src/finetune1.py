@@ -9,13 +9,18 @@ import torch.nn as nn
 import torch
 from torch.utils.data import DataLoader
 import numpy as np
-from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 import wandb
 import os
 import argparse
 from functools import partial
 
-from BoXHED_Fuse.src.helpers import tokenization, convert_to_list, find_next_dir_index, load_all_notes
+from BoXHED_Fuse.src.helpers import tokenization,
+convert_to_list, 
+find_next_dir_index, 
+load_all_notes, 
+explode_train_target, 
+compute_metrics, 
+group_train_val
 
 
 '''
@@ -28,30 +33,7 @@ python -m BoXHED_Fuse.src.finetune1 --test --use-wandb --gpu-no 3 --note-type ra
 # print(sys.path)
 # exit()
 
-def group_train_test(ID) -> Tuple[List[int], List[int]]:
-    ''' Creates shuffled 80/20 split for train and test data using indices.
-    Args:
-        ID: a pandas column of indexes
-    
-    Returns:
-        A Tuple containing lists of indexes for train and test
-    '''
-    ID             = ID.astype(int)
-    ID_unique_srtd = np.unique(ID)
-    np.random.seed(40)
-    np.random.shuffle(ID_unique_srtd)    
 
-    num_train_ids = int(.80 * len(ID_unique_srtd))
-    train_ids = ID_unique_srtd[:num_train_ids]
-    val_ids = ID_unique_srtd[num_train_ids:]
-
-    train = ID[ID.isin(train_ids)]
-    val = ID[ID.isin(val_ids)]
-
-    assert(len(train) + len(val) == len(ID))
-    assert(len(train_ids) + len(val_ids) == len(ID_unique_srtd))
-    assert(len(train_ids) + len(val_ids) == len(ID_unique_srtd))
-    return list(train.index), list(val.index)
 
 def do_tokenization(train : pd.DataFrame, train_idxs : List[int], 
                     val_idxs : List[int]) -> Tuple[Dataset, Dataset]:
@@ -76,23 +58,21 @@ def do_tokenization(train : pd.DataFrame, train_idxs : List[int],
     val_data = Dataset.from_pandas(val_data).select_columns(['text', 'label'])
 
 
-
-
-    if not os.path.exists(f'{model_out_dir}/data_cache'):
+    if not any(os.listdir(data_cache_dir )) :
         # define a function that will tokenize the model, and will return the relevant inputs for the model
         train_data = train_data.map(partial(tokenization, tokenizer, max_length=512), batched = True, batch_size = len(train_data) // 10)
         val_data = val_data.map(partial(tokenization, tokenizer, max_length=512), batched = True, batch_size = len(val_data) // 10)
 
-        token_path_train = f'{model_out_dir}/data_cache/tokenized_train_data'
-        token_path_val = f'{model_out_dir}/data_cache/tokenized_val_data'
+        token_path_train = f'{data_cache_dir}/tokenized_train_data'
+        token_path_val = f'{data_cache_dir}/tokenized_val_data'
         train_data.save_to_disk(token_path_train)
         val_data.save_to_disk(token_path_val)
         print(f'saved train, val tokens to {os.path.dirname(token_path_train)}')
 
     else: 
-        print(f'loading train, val from', f'{model_out_dir}/data_cache/')
-        train_data = train_data.load_from_disk(f'{model_out_dir}/data_cache/tokenized_train_data')
-        val_data = val_data.load_from_disk(f'{model_out_dir}/data_cache/tokenized_val_data')
+        print(f'loading train, val from {data_cache_dir}')
+        train_data = train_data.load_from_disk(f'{data_cache_dir}/tokenized_train_data')
+        val_data = val_data.load_from_disk(f'{data_cache_dir}/tokenized_val_data')
 
     train_data.set_format('torch', columns=['input_ids', 'attention_mask', 'label'])
     val_data.set_format('torch', columns=['input_ids', 'attention_mask', 'label'])
@@ -101,34 +81,9 @@ def do_tokenization(train : pd.DataFrame, train_idxs : List[int],
 
     return (train_data, val_data)
 
-def compute_metrics(pred) -> Dict[str, float]:
-    ''' Uses prediction label_ids and predicttions to compute precision recall, accuracy and f1. 
-    '''
-    labels = pred.label_ids
-    preds = pred.predictions.argmax(-1)
-    # argmax(pred.predictions, axis=1)
-    #pred.predictions.argmax(-1)
-    precision, recall, f1, _ = precision_recall_fscore_support(labels, preds, average='binary')
-    acc = accuracy_score(labels, preds)
-    return {
-        'accuracy': acc,
-        'f1': f1,
-        'precision': precision,
-        'recall': recall
-    }
 
-def explode(train):
-    '''
-    explode train['NOTE_ID_SEQ'] for meta-finetuning
-    drop duplicate notes
-    '''
-    positive_notes = train[train['label'] == 1]['NOTE_ID'].tolist()
-    train_sequences = pd.DataFrame(train[['ICUSTAY_ID', 'NOTE_ID_SEQ']].explode('NOTE_ID_SEQ').drop_duplicates())
-    train_sequences.rename(columns={'NOTE_ID_SEQ' : 'NOTE_ID'}, inplace=True)
-    train_sequences['label'] = train_sequences['NOTE_ID'].apply(lambda x: x in positive_notes)
-    train_sequences['label'].replace({True: 1, False: 0}, inplace=True)
-    train = train_sequences
-    return train
+
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -163,6 +118,7 @@ if __name__ == '__main__':
     print(f'read from {train_path}')
 
     model_out_dir = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/model_outputs/{args.model_name}_{args.note_type[:3]}_{args.noteid_mode}_out'
+    data_cache_dir = os.path.join(model_out_dir, 'data_cache')
 
     if args.test:
         train_path = os.path.join(os.path.dirname(train_path), 'testing', os.path.basename(train_path))
@@ -170,6 +126,9 @@ if __name__ == '__main__':
     
     if not os.path.exists(model_out_dir):
         os.makedirs(model_out_dir)
+    if not os.path.exists(data_cache_dir):
+        os.makedirs(data_cache_dir)
+        
     run_cntr = find_next_dir_index(model_out_dir)
     model_out_dir = os.path.join(model_out_dir, str(run_cntr))
     assert(not os.path.exists(model_out_dir))
@@ -219,13 +178,13 @@ if __name__ == '__main__':
 
     print(f"reading notes and target from {train_path}")
     train = pd.read_csv(train_path, converters = {'NOTE_ID_SEQ': convert_to_list})
-    target = 'delta_in_2_days'
+    target = 'delta_in_2_days' # FIXME
     train = train.rename(columns = {target:'label'})
 
     if args.noteid_mode == 'all':
         print(f'noteid_mode {args.noteid_mode}: exploding NOTE_ID_SEQ')
         # breakpoint()
-        train = explode(train)
+        train = explode_train_target(train)
 
     # if args.note_type == 'radiology':
     #     all_notes_path = '/data/datasets/mimiciv_notes/physionet.org/files/mimic-iv-note/2.2/note/radiology.csv'
@@ -239,9 +198,12 @@ if __name__ == '__main__':
 
     # join train with all_notes
     train = pd.merge(train, all_notes[['NOTE_ID','text']], on='NOTE_ID', how='left')
+    # breakpoint()
 
-    train_idxs, val_idxs = group_train_test(train['ICUSTAY_ID'])
+    train_idxs, val_idxs = group_train_val(train['ICUSTAY_ID'])
     train_data, val_data = do_tokenization(train, train_idxs, val_idxs)
+    # breakpoint()
+
 
     # define the training arguments
     training_args = TrainingArguments(
