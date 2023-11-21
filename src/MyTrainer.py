@@ -25,7 +25,7 @@ class MyTrainer(Trainer):
         print(f"I have a model: {model.__class__}")
 
         epoch = int(round(self.state.epoch))
-        checkpoint_path = f"{self.args.output_dir}/model_checkpoint__epoch{epoch}.pt"
+        checkpoint_path = f"{self.args.output_dir}/model_checkpoint_epoch{epoch}.pt"
         print(f"I want to save to: {checkpoint_path}")
         torch.save(model_out, checkpoint_path)  # Save model state_dict to .pt file
     

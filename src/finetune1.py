@@ -114,10 +114,10 @@ if __name__ == '__main__':
 
     os.environ["CUDA_VISIBLE_DEVICES"] = args.GPU_NO
 
-    train_path = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/targets/till_end_mimic_iv_extra_features_train_NOTE_TARGET_2_{args.note_type[:3]}_{args.noteid_mode}.csv'
+    train_path = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/targets/till_end_mimic_iv_extra_features_train_NOTE_TARGET_2_{args.note_type[:3]}_{args.noteid_mode}.csv'
     print(f'read from {train_path}')
 
-    model_out_dir = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/model_outputs/{args.model_name}_{args.note_type[:3]}_{args.noteid_mode}_out'
+    model_out_dir = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/BoXHED_Fuse/model_outputs/{args.model_name}_{args.note_type[:3]}_{args.noteid_mode}_out'
     data_cache_dir = os.path.join(model_out_dir, 'data_cache')
 
     if args.test:

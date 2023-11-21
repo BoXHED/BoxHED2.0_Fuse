@@ -110,23 +110,20 @@ if __name__ == '__main__':
     assert(args.noteid_mode == 'all' or args.noteid_mode == 'recent')
     args.GPU_NO = int(args.GPU_NO)
     finetuned_model_path = os.path.join(args.ckpt_dir, args.ckpt_model_name)
-    print("extract_embeddings.py args:")
-    for arg in vars(args):
-        print(f"\t{arg}: {getattr(args, arg)}")
 
     os.environ["CUDA_VISIBLE_DEVICES"] = str(args.GPU_NO)  # use the correct gpu
     device = torch.device(f'cuda' if torch.cuda.is_available() else 'cpu')
     print(f"device: {device}")
 
     # finetuned_model_path = root + '/model_from_ckpt1/meta_ft_classify.pt' # modify this line!
-    train_NOTE_TARGET_path = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/targets/till_end_mimic_iv_extra_features_train_NOTE_TARGET_2_{args.note_type[:3]}_{args.noteid_mode}.csv'
-    test_NOTE_TARGET_path = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/targets/till_end_mimic_iv_extra_features_test_NOTE_TARGET_2_{args.note_type[:3]}_{args.noteid_mode}.csv'
-    train_NOTE_path = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_train_NOTE_{args.note_type[:3]}_{args.noteid_mode}.csv'
-    test_NOTE_path = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_test_NOTE_{args.note_type[:3]}_{args.noteid_mode}.csv'
+    train_NOTE_TARGET_path = f'{os.getenv("BHF_ROOT")}/JSS_SUBMISSION_NEW/data/targets/till_end_mimic_iv_extra_features_train_NOTE_TARGET_2_{args.note_type[:3]}_{args.noteid_mode}.csv'
+    test_NOTE_TARGET_path = f'{os.getenv("BHF_ROOT")}/JSS_SUBMISSION_NEW/data/targets/till_end_mimic_iv_extra_features_test_NOTE_TARGET_2_{args.note_type[:3]}_{args.noteid_mode}.csv'
+    train_NOTE_path = f'{os.getenv("BHF_ROOT")}/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_train_NOTE_{args.note_type[:3]}_{args.noteid_mode}.csv'
+    test_NOTE_path = f'{os.getenv("BHF_ROOT")}/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_test_NOTE_{args.note_type[:3]}_{args.noteid_mode}.csv'
     epoch = re.findall(r'\d+', args.ckpt_model_name)[-1]
     outfolder = f"{args.model_name}_{args.note_type[:3]}_{args.noteid_mode}_out/from_epoch{epoch}"
-    out_dir = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/final{"/testing" if args.test else ""}/{outfolder}'
-    out_embs_dir = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/embs{"/testing" if args.test else ""}/{outfolder}'
+    out_dir = f'{os.getenv("BHF_ROOT")}/JSS_SUBMISSION_NEW/data/final{"/testing" if args.test else ""}/{outfolder}'
+    out_embs_dir = f'{os.getenv("BHF_ROOT")}/JSS_SUBMISSION_NEW/data/embs{"/testing" if args.test else ""}/{outfolder}'
     
     if not os.path.exists(out_dir) and args.noteid_mode == 'recent':
         os.makedirs(out_dir)
@@ -160,7 +157,7 @@ if __name__ == '__main__':
 
     tokenizer = None
     if args.model_type == 'T5':
-        model_dir = os.path.join('BoXHED_Fuse/models', args.model_name)
+        model_dir = os.path.join(f'{os.getenv("BHF_ROOT")}/models', args.model_name)
         tokenizer = AutoTokenizer.from_pretrained(model_dir)
     elif args.model_type == 'Longformer':
         model_path = "yikuan8/Clinical-Longformer"
@@ -191,7 +188,7 @@ if __name__ == '__main__':
     # train_data.set_format('torch', columns=['input_ids', 'attention_mask', 'label']) # FIXME this is more elegant...
     # val_data.set_format('torch', columns=['input_ids', 'attention_mask', 'label'])
 
-    batch_size = 48
+    batch_size = 24 # 48
     train_dataloader = generate_dataloader(tokenized_train_notes, batch_size, device)
     test_dataloader = generate_dataloader(tokenized_test_notes, batch_size, device)
     print("train, test, dataloaders generated")
@@ -246,14 +243,14 @@ if __name__ == '__main__':
         train_df_big = merge_text(train_df_big)
         test_df_big = merge_text(test_df_big)
         print("merging and filling embeddings...")
-        breakpoint()
+        # breakpoint()
         train_out_df = merge_and_fill_embeddings(train_df_small, train_df_big)
         print("merged and filled embeddings for train_out_df")
         test_out_df = merge_and_fill_embeddings(test_df_small, test_df_big)
         print("merged and filled embeddings for test_out_df")
         train_out_df = format_cols(train_out_df)
         test_out_df = format_cols(test_out_df)
-        breakpoint()
+        # breakpoint()
         train_out_df.to_csv(train_outpath, index = False)
         print("wrote to", train_outpath)
         test_out_df.to_csv(test_outpath, index = False)

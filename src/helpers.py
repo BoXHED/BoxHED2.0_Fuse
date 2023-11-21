@@ -4,7 +4,7 @@ import ast
 import torch
 from typing import *
 import numpy as np
-from sklearn.metrics import accuracy_score, precision_recall_fscore_support
+from sklearn.metrics import accuracy_score, precision_recall_fscore_support, roc_auc_score, average_precision_score
 
 
 def tokenization(tokenizer, batched_text, max_length, truncation = True):
@@ -63,7 +63,7 @@ def merge_embs_to_seq(train_target, train_embs) -> List:
 
     args:
         train_embs: df consisting of {NOTE_ID, 0, 1, ... 63} corresponding to each element in the embedding 
-        train_target: df containing NOTE_ID_SEQ
+        train_target: df containing NOTE_ID and NOTE_ID_SEQ
     '''
     train_embs_seq_list = []
     for note_id_seq in train_target['NOTE_ID_SEQ']:
@@ -103,11 +103,19 @@ def group_train_val(ID) -> Tuple[List[int], List[int]]:
     assert(len(train_ids) + len(val_ids) == len(ID_unique_srtd))
     return list(train.index), list(val.index)
 
-def validate_train_target_embseq(train_target_embseq):
-    train_target_embseq['emb_SEQ_len'] = train_target_embseq['emb_SEQ'].apply(len)
-    train_target_embseq['NOTE_ID_SEQ_len'] = train_target_embseq['NOTE_ID_SEQ'].apply(len)
-    assert((train_target_embseq['emb_SEQ_len'] == train_target_embseq['NOTE_ID_SEQ_len']).all())
-    print('validation of emb_SEQ_len and NOTE_ID_SEQ_len passed!')
+# def validate_train_target_embseq(train_target_embseq):
+#     train_target_embseq['emb_SEQ_len'] = train_target_embseq['emb_SEQ'].apply(len)
+#     train_target_embseq['NOTE_ID_SEQ_len'] = train_target_embseq['NOTE_ID_SEQ'].apply(len)
+#     assert((train_target_embseq['emb_SEQ_len'] == train_target_embseq['NOTE_ID_SEQ_len']).all())
+#     print('validation of emb_SEQ_len and NOTE_ID_SEQ_len passed!')
+
+def validate_train_embseq(train_embseq, train_target):
+    train_embseq = train_embseq.copy()
+    train_embseq['emb_seq_len'] = train_embseq['emb_seq'].apply(len)
+    train_target['NOTE_ID_SEQ_len'] = train_target['NOTE_ID_SEQ'].apply(len)
+    assert((train_target['NOTE_ID_SEQ_len'] == train_embseq['emb_seq_len']).all())
+
+
 
 def compute_metrics(pred) -> Dict[str, float]:
     ''' Uses prediction label_ids and predicttions to compute precision recall, accuracy and f1. 
@@ -124,6 +132,57 @@ def compute_metrics(pred) -> Dict[str, float]:
         'precision': precision,
         'recall': recall
     }
+
+def compute_metrics_LSTM(labels, preds) -> Dict[str, float]:
+    ''' 
+    Uses predictions, labels to compute precision recall, accuracy and f1. 
+    '''
+    # argmax(pred.predictions, axis=1)
+    #pred.predictions.argmax(-1)
+    # precision, recall, f1, _ = precision_recall_fscore_support(labels, preds, average='binary')
+    # acc = accuracy_score(labels, preds)
+    try:
+        auc = roc_auc_score(labels, preds)
+    except ValueError as e:
+        print(f"Error: {e}")
+        auc = None
+
+    auprc = average_precision_score(labels, preds)
+    return {
+        'auc' : auc,
+        'auprc' : auprc,
+    }
+
+from torch.utils import data
+# maximum sequence length
+max_num_notes = 32
+doc_emb_size = 64 # 768
+    
+class Sequential_Dataset(data.Dataset):
+
+    def __init__(self, ds):
+        'Initialization'
+        self.ds = ds
+
+    def __len__(self):
+        'Denotes the total number of samples'
+        return len(self.ds)
+
+    def __getitem__(self, index):
+        'Generates one sample of data'
+        # Select sample
+        # Load data and get label        
+        y = self.ds['label'][index]
+        emb_seq = self.ds['emb_seq'][index]
+        emb_seq_out = torch.zeros(size=(max_num_notes, doc_emb_size), dtype=torch.float)  
+      
+        if len(emb_seq) > max_num_notes:
+            emb_seq_out[:max_num_notes] = emb_seq[:max_num_notes]
+        else:
+            emb_seq_out[:len(emb_seq)] = emb_seq
+
+        return emb_seq_out.cuda(), y
+
 if __name__ == '__main__':
     train_target_path = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/targets/testing/till_end_mimic_iv_extra_features_train_NOTE_TARGET_2_rad_all.csv'
     train_target = pd.read_csv(train_target_path, converters = {'NOTE_ID_SEQ': convert_to_list})
