@@ -18,6 +18,7 @@ from BoXHED_Fuse.src.helpers import find_next_dir_index, merge_embs_to_seq, conv
 from BoXHED_Fuse.src.MyTrainer import MyTrainer 
 from BoXHED_Fuse.models.ClinicalLSTM import ClinicalLSTM
 import copy
+# from Ranger import Ranger
 
 
 
@@ -78,7 +79,6 @@ def finetune(train_emb_seq, lr, batch_size, train_epoch):
         # breakpoint()
         # ARE YOU SURE YOU WANT TO USE MULTIPLE DEVICES?
         print("Let's use", torch.cuda.device_count(), "GPUs!")
-        # breakpoint()
         model = nn.DataParallel(model, dim = 1)
             
     print('--- Data Preparation ---')
@@ -104,6 +104,8 @@ def finetune(train_emb_seq, lr, batch_size, train_epoch):
     
     
     opt = torch.optim.Adam(model.parameters(), lr = lr)
+    # opt = Ranger(model.parameters(), lr = lr)
+    scheduler = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=lr, steps_per_epoch=len(training_generator), epochs=train_epoch)
     # early stopping
     max_auc = 0
     model_max = copy.deepcopy(model)
@@ -137,6 +139,8 @@ def finetune(train_emb_seq, lr, batch_size, train_epoch):
             opt.zero_grad()
             loss.backward()
             opt.step()
+            scheduler.step()
+
            
         # every epoch test
         with torch.set_grad_enabled(False):

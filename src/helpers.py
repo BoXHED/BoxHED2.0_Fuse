@@ -1,5 +1,6 @@
 import os 
 import pandas as pd
+from tqdm import tqdm
 import ast
 import torch
 from typing import *
@@ -32,6 +33,12 @@ def find_next_dir_index(directory_path):
 
 def convert_to_list(s):
     return ast.literal_eval(s)
+
+def convert_to_nested_list(s):
+    return ast.literal_eval(s.replace('array', ''))
+
+
+
 
 def load_all_notes(note_type):
     if note_type == 'radiology':
@@ -66,7 +73,7 @@ def merge_embs_to_seq(train_target, train_embs) -> List:
         train_target: df containing NOTE_ID and NOTE_ID_SEQ
     '''
     train_embs_seq_list = []
-    for note_id_seq in train_target['NOTE_ID_SEQ']:
+    for note_id_seq in tqdm(train_target['NOTE_ID_SEQ']):
         note_id_seq_df = pd.DataFrame(note_id_seq, columns=['NOTE_ID'])
         train_embs_seq = pd.merge(note_id_seq_df,
                                 train_embs,
@@ -75,6 +82,7 @@ def merge_embs_to_seq(train_target, train_embs) -> List:
         train_embs_seq_list.append(train_embs_seq['emb'].values.tolist())
     train_target_embseq = train_target.copy()
     train_target_embseq['emb_seq'] = train_embs_seq_list
+    validate_train_emb_seq(train_target_embseq, train_target)
     return train_target_embseq 
 
 
@@ -109,7 +117,7 @@ def group_train_val(ID) -> Tuple[List[int], List[int]]:
 #     assert((train_target_embseq['emb_SEQ_len'] == train_target_embseq['NOTE_ID_SEQ_len']).all())
 #     print('validation of emb_SEQ_len and NOTE_ID_SEQ_len passed!')
 
-def validate_train_embseq(train_embseq, train_target):
+def validate_train_emb_seq(train_embseq, train_target):
     train_embseq = train_embseq.copy()
     train_embseq['emb_seq_len'] = train_embseq['emb_seq'].apply(len)
     train_target['NOTE_ID_SEQ_len'] = train_target['NOTE_ID_SEQ'].apply(len)
