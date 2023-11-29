@@ -13,7 +13,7 @@ import wandb
 import argparse
 from functools import partial
 
-from BoXHED_Fuse.src.helpers import find_next_dir_index, merge_embs_to_seq, convert_to_list, compute_metrics_LSTM, Sequential_Dataset, group_train_val, explode_train_target, validate_train_embseq
+from BoXHED_Fuse.src.helpers import find_next_dir_index, merge_embs_to_seq, convert_to_list, compute_metrics_LSTM, Sequential_Dataset, group_train_val, explode_train_target, validate_train_emb_seq
 from BoXHED_Fuse.src.MyTrainer import MyTrainer 
 from BoXHED_Fuse.models.ClinicalLSTM import ClinicalLSTM
 import copy
@@ -35,9 +35,8 @@ def test_finetune(data_generator, model):
         score = model(output)
         
         m = torch.nn.Sigmoid()
-        logits = torch.squeeze(m(score))
-        loss_fct = torch.nn.BCELoss()            
-        
+        logits = torch.flatten(torch.squeeze(m(score)))
+        loss_fct = torch.nn.BCELoss()    
         label = torch.from_numpy(np.array(label)).float().cuda()
 
         loss = loss_fct(logits, label)
@@ -58,7 +57,7 @@ def test_finetune(data_generator, model):
 
     return metrics, y_pred, loss.item()
 
-def main_finetune(train_embseq, lr, batch_size, train_epoch):
+def finetune(train_emb_seq, lr, batch_size, train_epoch):
     '''
     finetune the model. Here, we are finetuning the LSTM!
     
@@ -75,9 +74,10 @@ def main_finetune(train_embseq, lr, batch_size, train_epoch):
     model.cuda()
     
     if torch.cuda.device_count() > 1:
-        breakpoint()
+        # breakpoint()
         # ARE YOU SURE YOU WANT TO USE MULTIPLE DEVICES?
         print("Let's use", torch.cuda.device_count(), "GPUs!")
+        # breakpoint()
         model = nn.DataParallel(model, dim = 1)
             
     print('--- Data Preparation ---')
@@ -87,9 +87,9 @@ def main_finetune(train_embseq, lr, batch_size, train_epoch):
               'num_workers': 0, 
               'drop_last': True}
     
-    train_idxs, val_idxs = group_train_val(train_embseq['ICUSTAY_ID'])
-    train_data = train_embseq[['emb_seq', 'label']].iloc[train_idxs]
-    val_data = train_embseq[['emb_seq', 'label']].iloc[val_idxs]
+    train_idxs, val_idxs = group_train_val(train_emb_seq['ICUSTAY_ID'])
+    train_data = train_emb_seq[['emb_seq', 'label']].iloc[train_idxs]
+    val_data = train_emb_seq[['emb_seq', 'label']].iloc[val_idxs]
     train_data = Dataset.from_pandas(train_data)
     val_data = Dataset.from_pandas(val_data)
     train_data.set_format('torch', columns=['label', 'emb_seq'])
@@ -113,17 +113,21 @@ def main_finetune(train_embseq, lr, batch_size, train_epoch):
         model.train()
         for i, (output, label) in enumerate(training_generator):
             output = output.permute(1,0,2)
+            # breakpoint()
             score = model(output.cuda())
             label = torch.from_numpy(np.array(label)).float().cuda()
             
             loss_fct = torch.nn.BCELoss()
             m = torch.nn.Sigmoid()
-            n = torch.squeeze(m(score))
+            logits = torch.flatten(torch.squeeze(m(score)))
             
-            loss = loss_fct(n, label)
+            # breakpoint()
+            loss = loss_fct(logits, label)
             loss_history.append(loss.item())
             if args.use_wandb:
-                wandb.log({"Train Step Loss": loss.item(), 'Learning Rate': opt.param_groups[0]['lr'], 'Epoch': epo + (i+1) / len(training_generator) - 1})
+                wandb.log({"Train Step Loss": loss.item(),
+                            'Learning Rate': opt.param_groups[0]['lr'],
+                            'Epoch': epo + (i+1) / (len(training_generator) - 1)})
 
             opt.zero_grad()
             loss.backward()
@@ -171,6 +175,7 @@ if __name__ == '__main__':
     parser.add_argument('--num-epochs', dest = 'num_epochs', help = 'num_epochs to train')
     parser.add_argument('--noteid-mode', dest = 'noteid_mode', help = 'kw: all or recent')
     parser.add_argument('--embs-dir', dest = 'embs_dir', help = 'dir of train.pt containing embeddings')
+    parser.add_argument('--batch-size', dest = 'batch_size')
 
     args = parser.parse_args()
     args.num_epochs = int(args.num_epochs)
@@ -198,35 +203,38 @@ if __name__ == '__main__':
     os.environ["CUDA_VISIBLE_DEVICES"] = str(args.GPU_NO)
 
     # ===== Read Data =====
-    train_embs = torch.load(f'{args.embs_dir}/train_embs.pt')
+    print('reading data')
+    train_emb = torch.load(f'{args.embs_dir}/train_embs.pt')
     train_target = pd.read_csv(train_target_path, converters = {'NOTE_ID_SEQ': convert_to_list})
 
     # ===== Merge data into {train_embs_seq, label} =====
+    print('merging data into df with cols {train_embs_seq, label}')
     target = 'delta_in_2_days' 
     train_target.rename(columns = {target:'label'}, inplace=True)
     train_target_exploded = explode_train_target(train_target)
-    train_embs_df = pd.DataFrame()
-    train_embs_df['emb'] = [np.array(e) for e in train_embs]
-    train_embs_df = pd.concat([train_target_exploded, train_embs_df], axis=1)
-    # train_target_exploded['emb'] = [np.array(e) for e in train_embs]
-    train_embs_seq = merge_embs_to_seq(train_target, train_embs=train_embs_df)
-    validate_train_embseq(train_embs_seq, train_target)
+    train_emb_df = pd.DataFrame()
+    train_emb_df['emb'] = [np.array(e) for e in train_emb]
+    train_emb_df = pd.concat([train_target_exploded, train_emb_df], axis=1)
+    print('merging on NOTE_ID_SEQ...')
+    train_emb_seq = merge_embs_to_seq(train_target, train_embs=train_emb_df)
+    validate_train_emb_seq(train_emb_seq, train_target)
 
     # ===== Train LSTM ===== 
+    print('go for training')
     RUN_NAME = f'{MODEL_NAME}_{args.note_type[:3]}_{args.noteid_mode}_{RUN_CNTR}'
     if args.use_wandb:
-        wandb.login(key=os.getenv('WANDB_KEY_PERSONAL'), relogin = True)
-        # wandb.login(key=os.getenv('WANDB_KEY_TAMU'), relogin = True)
+        # wandb.login(key=os.getenv('WANDB_KEY_PERSONAL'), relogin = True)
+        wandb.login(key=os.getenv('WANDB_KEY_TAMU'), relogin = True)
         
         # resume = args.ckpt_dir != None
         wandb.init(project='BoXHED_Fuse', name=RUN_NAME)
         print(wandb.run.get_url())
 
     lr = 1e-5 
-    batch_size = 2
-    train_epoch = 1
+    batch_size = args.batch_size
+    train_epoch = args.num_epochs
 
-    out = main_finetune(train_embs_seq, lr, batch_size, train_epoch)
+    out = finetune(train_emb_seq, lr, batch_size, train_epoch)
     # breakpoint()
     # ===== Save Sequential Embeddings =====
     # extract_emb_seq()
