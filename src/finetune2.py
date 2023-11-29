@@ -2,6 +2,7 @@ from typing import *
 import pandas as pd
 import os
 import torch.nn as nn
+import time
 from torch.utils.data import DataLoader
 from torch.utils import data
 import torch
@@ -13,7 +14,7 @@ import wandb
 import argparse
 from functools import partial
 
-from BoXHED_Fuse.src.helpers import find_next_dir_index, merge_embs_to_seq, convert_to_list, compute_metrics_LSTM, Sequential_Dataset, group_train_val, explode_train_target, validate_train_emb_seq
+from BoXHED_Fuse.src.helpers import find_next_dir_index, merge_embs_to_seq, convert_to_list, convert_to_nested_list, compute_metrics_LSTM, Sequential_Dataset, group_train_val, explode_train_target, validate_train_emb_seq
 from BoXHED_Fuse.src.MyTrainer import MyTrainer 
 from BoXHED_Fuse.models.ClinicalLSTM import ClinicalLSTM
 import copy
@@ -109,6 +110,7 @@ def finetune(train_emb_seq, lr, batch_size, train_epoch):
    
     print('--- Go for Training ---')
     torch.backends.cudnn.benchmark = True
+    tstart = time.time()
     for epo in range(train_epoch):
         model.train()
         for i, (output, label) in enumerate(training_generator):
@@ -126,9 +128,12 @@ def finetune(train_emb_seq, lr, batch_size, train_epoch):
             loss_history.append(loss.item())
             if args.use_wandb:
                 wandb.log({"Train Step Loss": loss.item(),
-                            'Learning Rate': opt.param_groups[0]['lr'],
-                            'Epoch': epo + (i+1) / (len(training_generator) - 1)})
-
+                    'Learning Rate': opt.param_groups[0]['lr'],
+                    'Epoch': epo + (i+1) / (len(training_generator) - 1)})
+            print("Train Step Loss", loss.item(),
+                    'Learning Rate', opt.param_groups[0]['lr'],
+                    'Epoch', epo + (i+1) / (len(training_generator) - 1),
+                    'Time', int(time.time() - tstart))
             opt.zero_grad()
             loss.backward()
             opt.step()
@@ -172,14 +177,14 @@ if __name__ == '__main__':
     parser.add_argument('--use-wandb', action = 'store_true', help = 'enable wandb', default=False)
     parser.add_argument('--gpu-no', dest = 'GPU_NO', help='use GPU_NO specified (this may be a single number or several. eg: 1 or 1,2,3,4)')
     parser.add_argument('--note-type', dest = 'note_type', help='which notes, radiology or discharge?')
-    parser.add_argument('--num-epochs', dest = 'num_epochs', help = 'num_epochs to train')
+    parser.add_argument('--num-epochs', dest = 'num_epochs', help = 'num_epochs to train', type=int)
     parser.add_argument('--noteid-mode', dest = 'noteid_mode', help = 'kw: all or recent')
     parser.add_argument('--embs-dir', dest = 'embs_dir', help = 'dir of train.pt containing embeddings')
-    parser.add_argument('--batch-size', dest = 'batch_size')
+    parser.add_argument('--batch-size', dest = 'batch_size', default=4, type=int)
 
     args = parser.parse_args()
-    args.num_epochs = int(args.num_epochs)
     assert(os.path.exists(args.embs_dir))
+
 
     train_target_path = f'{os.getenv("BHF_ROOT")}/JSS_SUBMISSION_NEW/data/targets/till_end_mimic_iv_extra_features_train_NOTE_TARGET_2_{args.note_type[:3]}_{args.noteid_mode}.csv'
     # train_embs_path = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/embs{"/testing"}/{"Clinical-T5-Base"}_{"rad"}_{"all"}_out/from_epoch1/10/train_embs.pt'
@@ -190,6 +195,9 @@ if __name__ == '__main__':
     if args.test:
         train_target_path = os.path.join(os.path.dirname(train_target_path), 'testing', os.path.basename(train_target_path)) 
         model_out_dir = os.path.join(os.path.dirname(model_out_dir), 'testing', os.path.basename(model_out_dir))
+    
+    train_emb_seq_path = f'{model_out_dir}/train_emb_seq.csv' # tmp csv for multiple runs
+
     
     if not os.path.exists(model_out_dir):
         os.makedirs(model_out_dir)
@@ -206,18 +214,22 @@ if __name__ == '__main__':
     print('reading data')
     train_emb = torch.load(f'{args.embs_dir}/train_embs.pt')
     train_target = pd.read_csv(train_target_path, converters = {'NOTE_ID_SEQ': convert_to_list})
-
     # ===== Merge data into {train_embs_seq, label} =====
-    print('merging data into df with cols {train_embs_seq, label}')
-    target = 'delta_in_2_days' 
-    train_target.rename(columns = {target:'label'}, inplace=True)
-    train_target_exploded = explode_train_target(train_target)
-    train_emb_df = pd.DataFrame()
-    train_emb_df['emb'] = [np.array(e) for e in train_emb]
-    train_emb_df = pd.concat([train_target_exploded, train_emb_df], axis=1)
-    print('merging on NOTE_ID_SEQ...')
-    train_emb_seq = merge_embs_to_seq(train_target, train_embs=train_emb_df)
-    validate_train_emb_seq(train_emb_seq, train_target)
+    if (not os.path.exists(train_emb_seq_path)):
+        print('merging data into df with cols {train_embs_seq, label}')
+        target = 'delta_in_2_days' 
+        train_target.rename(columns = {target:'label'}, inplace=True)
+        train_target_exploded = explode_train_target(train_target)
+        train_emb_df = pd.DataFrame()
+        train_emb_df['emb'] = [np.array(e) for e in train_emb]
+        train_emb_df = pd.concat([train_target_exploded, train_emb_df], axis=1)
+        print('merging on NOTE_ID_SEQ...')
+        train_emb_seq = merge_embs_to_seq(train_target, train_embs=train_emb_df)
+        validate_train_emb_seq(train_emb_seq, train_target)
+        train_emb_seq.to_csv(train_emb_seq_path, index=False)
+    else:
+        print('train_embs_seq exists!')
+        train_emb_seq = pd.read_csv(train_emb_seq_path, converters={'emb_seq': convert_to_nested_list})
 
     # ===== Train LSTM ===== 
     print('go for training')
