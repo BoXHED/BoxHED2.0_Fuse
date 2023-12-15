@@ -4,6 +4,7 @@ from tqdm import tqdm
 import ast
 import torch
 from typing import *
+import time
 import numpy as np
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support, roc_auc_score, average_precision_score
 
@@ -164,12 +165,13 @@ def compute_metrics_LSTM(labels, preds) -> Dict[str, float]:
 from torch.utils import data
 # maximum sequence length
 max_num_notes = 32
-doc_emb_size = 64 # 768
+# doc_emb_size = 64 # 768
     
 class Sequential_Dataset(data.Dataset):
 
-    def __init__(self, ds):
+    def __init__(self, ds, doc_emb_size):
         'Initialization'
+        self.doc_emb_size = doc_emb_size
         self.ds = ds
 
     def __len__(self):
@@ -177,18 +179,62 @@ class Sequential_Dataset(data.Dataset):
         return len(self.ds)
 
     def __getitem__(self, index):
+
         'Generates one sample of data'
         # Select sample
-        # Load data and get label        
+        # Load data and get label 
+        print('start getitem')
+        t0 = time.time()       
         y = self.ds['label'][index]
         emb_seq = self.ds['emb_seq'][index]
-        emb_seq_out = torch.zeros(size=(max_num_notes, doc_emb_size), dtype=torch.float)  
-      
+        emb_seq_out = torch.zeros(size=(max_num_notes, self.doc_emb_size), dtype=torch.float)  
+
+        print(f'emb_seq_out (zeroos) took {time.time() - t0} seconds')
+        t0 = time.time()
         if len(emb_seq) > max_num_notes:
             emb_seq_out[:max_num_notes] = emb_seq[:max_num_notes]
         else:
             emb_seq_out[:len(emb_seq)] = emb_seq
+        
+        print(f'populated emb_seq_out for getitem, took {time.time() - t0} seconds')
 
+        return emb_seq_out.cuda(), y
+    
+class Sequential_Dataset_FAST(data.Dataset):
+
+    def __init__(self, train_target, train_target_exploded, train_emb):
+        'Initialization'
+        self.train_target = train_target
+        self.train_target_exploded = train_target_exploded
+        self.train_embs = train_emb
+        self.doc_emb_size = train_emb.shape[1] # 64
+
+    def __len__(self):
+        'Denotes the total number of samples'
+        return len(self.train_target)
+
+    def __getitem__(self, index):
+
+        'Generates one sample of data'
+        # t0 = time.time()
+        y = self.train_target['label'].iloc[index]
+        note_id_seq = self.train_target.NOTE_ID_SEQ.iloc[index]
+        exploded_idx = pd.merge(pd.DataFrame({'NOTE_ID': note_id_seq}, columns=['NOTE_ID']),
+                self.train_target_exploded,
+                how='left',
+                on=['NOTE_ID'])
+        emb_seq = self.train_embs[exploded_idx.index]
+        # print(f'getting emb_seq took {time.time() - t0} seconds')
+
+        emb_seq_out = torch.zeros(size=(max_num_notes, self.doc_emb_size), dtype=torch.float)  
+        # print(f'emb_seq_out (zeros) took {time.time() - t0} seconds')
+        # t0 = time.time()
+        if len(emb_seq) > max_num_notes:
+            emb_seq_out[:max_num_notes] = emb_seq[:max_num_notes]
+        else:
+            emb_seq_out[:len(emb_seq)] = emb_seq
+        
+        # print(f'populated emb_seq_out for getitem, took {time.time() - t0} seconds')
         return emb_seq_out.cuda(), y
 
 if __name__ == '__main__':

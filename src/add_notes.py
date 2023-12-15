@@ -3,10 +3,9 @@ import argparse
 from time import time
 import os
 import wandb
-from tqdm.auto import tqdm
 from log_artifact import log_artifact
 from functools import partial
-
+from tqdm.auto import tqdm
 tqdm.pandas()
 
 def generate_stay_and_note_timing_table(relevant_subjects, stays, notes):

@@ -15,7 +15,7 @@ import argparse
 from functools import partial
 
 from BoXHED_Fuse.src.log_artifact import log_artifact
-from BoXHED_Fuse.src.helpers import find_next_dir_index, merge_embs_to_seq, convert_to_list, convert_to_nested_list, compute_metrics_LSTM, Sequential_Dataset, group_train_val, explode_train_target, validate_train_emb_seq
+from BoXHED_Fuse.src.helpers import find_next_dir_index, merge_embs_to_seq, convert_to_list, convert_to_nested_list, compute_metrics_LSTM, Sequential_Dataset, Sequential_Dataset_FAST, group_train_val, explode_train_target, validate_train_emb_seq
 from BoXHED_Fuse.src.MyTrainer import MyTrainer 
 from BoXHED_Fuse.models.ClinicalLSTM import ClinicalLSTM
 import copy
@@ -60,7 +60,7 @@ def test_finetune(data_generator, model):
 
     return metrics, y_pred, loss.item()
 
-def finetune(train_emb_seq, lr, batch_size, train_epoch):
+def finetune(train_target, train_emb, lr, batch_size, train_epoch):
     '''
     finetune the model. Here, we are finetuning the LSTM!
     
@@ -89,19 +89,24 @@ def finetune(train_emb_seq, lr, batch_size, train_epoch):
               'num_workers': 0, 
               'drop_last': True}
     
-    train_idxs, val_idxs = group_train_val(train_emb_seq['ICUSTAY_ID'])
-    train_data = train_emb_seq[['emb_seq', 'label']].iloc[train_idxs]
-    val_data = train_emb_seq[['emb_seq', 'label']].iloc[val_idxs]
-    train_data = Dataset.from_pandas(train_data)
-    val_data = Dataset.from_pandas(val_data)
-    train_data.set_format('torch', columns=['label', 'emb_seq'])
-    val_data.set_format('torch', columns=['label', 'emb_seq'])
+    train_target_exploded = explode_train_target(train_target)
+    train_target_exploded.reset_index(inplace=True)
+    train_idxs, val_idxs = group_train_val(train_target['ICUSTAY_ID'])
+    # train_data = train_emb_seq[['emb_seq', 'label']].iloc[train_idxs]
+    # val_data = train_emb_seq[['emb_seq', 'label']].iloc[val_idxs]
+    # train_data = Dataset.from_pandas(train_data)
+    # val_data = Dataset.from_pandas(val_data)
+    # train_data.set_format('torch', columns=['label', 'emb_seq'])
+    # val_data.set_format('torch', columns=['label', 'emb_seq'])
 
-    training_set = Sequential_Dataset(train_data)
+    train_data = train_target.iloc[train_idxs]
+    val_data = train_target.iloc[val_idxs]
+
+    training_set = Sequential_Dataset_FAST(train_data, train_target_exploded, train_emb)
     training_generator = data.DataLoader(training_set, **params)
 
-    validation_set = Sequential_Dataset(val_data)
-    validation_generator = data.DataLoader(validation_set, **params)
+    validation_set = Sequential_Dataset_FAST(val_data, train_target_exploded, train_emb)
+    training_generator = data.DataLoader(validation_set, **params)
     
     
     opt = torch.optim.Adam(model.parameters(), lr = lr)
@@ -114,27 +119,31 @@ def finetune(train_emb_seq, lr, batch_size, train_epoch):
     print('--- Go for Training ---')
     torch.backends.cudnn.benchmark = True
     tstart = time.time()
+    t0 = time.time()
     for epo in range(train_epoch):
         model.train()
         for i, (output, label) in enumerate(training_generator):
-            # breakpoint()
+            print(f'time for loading batch: {time.time() - t0}')
+            t0 = time.time()
             output = output.permute(1,0,2)
-            # breakpoint()
-            # breakpoint()
             score = model(output.cuda())
+            print(f'time after forward: {time.time() - t0}')
+            t0 = time.time()
+
             # print('output.shape:', output.shape)
             # print('score.shape:', score.shape)
             # print('label.shape:', label.shape)
             # breakpoint()
             label = torch.from_numpy(np.array(label)).float().cuda()
-            
             loss_fct = torch.nn.BCELoss()
             m = torch.nn.Sigmoid()
             logits = torch.flatten(torch.squeeze(m(score)))
-            
+            print(f'time for flatten, squeeze, ... {time.time() - t0}')
+            t0 = time.time()
             # breakpoint()
             loss = loss_fct(logits, label)
             loss_history.append(loss.item())
+
             if args.use_wandb:
                 wandb.log({"Train Step Loss": loss.item(),
                     'Learning Rate': opt.param_groups[0]['lr'],
@@ -145,8 +154,11 @@ def finetune(train_emb_seq, lr, batch_size, train_epoch):
                     'Time', int(time.time() - tstart))
             opt.zero_grad()
             loss.backward()
+            print(f'time for backward: {time.time() - t0}')
+            t0 = time.time()
             opt.step()
             scheduler.step()
+            print(f'time for step: {time.time() - t0}')
 
            
         # every epoch test
@@ -227,21 +239,28 @@ if __name__ == '__main__':
     train_emb = torch.load(f'{args.embs_dir}/train_embs.pt')
     train_target = pd.read_csv(train_target_path, converters = {'NOTE_ID_SEQ': convert_to_list})
     # ===== Merge data into {train_embs_seq, label} =====
-    if (not os.path.exists(train_emb_seq_path)):
-        print('merging data into df with cols {train_embs_seq, label}')
-        target = 'delta_in_2_days' 
-        train_target.rename(columns = {target:'label'}, inplace=True)
-        train_target_exploded = explode_train_target(train_target)
-        train_emb_df = pd.DataFrame()
-        train_emb_df['emb'] = [np.array(e) for e in train_emb]
-        train_emb_df = pd.concat([train_target_exploded, train_emb_df], axis=1)
-        print('merging on NOTE_ID_SEQ...')
-        train_emb_seq = merge_embs_to_seq(train_target, train_embs=train_emb_df)
-        validate_train_emb_seq(train_emb_seq, train_target)
-        train_emb_seq.to_csv(train_emb_seq_path, index=False)
-    else:
-        print('train_embs_seq exists!')
-        train_emb_seq = pd.read_csv(train_emb_seq_path, converters={'emb_seq': convert_to_nested_list})
+    print('merging data into df with cols {train_embs_seq, label}')
+    target = 'delta_in_2_days' 
+    train_target.rename(columns = {target:'label'}, inplace=True)
+
+
+    # train_emb_seq_path = f"train_emb_seq_path_TMP_{find_next_dir_index('.')}" # FIXME debug purposes
+    # if (not os.path.exists(train_emb_seq_path)):
+    #     print('merging data into df with cols {train_embs_seq, label}')
+    #     target = 'delta_in_2_days' 
+    #     train_target.rename(columns = {target:'label'}, inplace=True)
+    #     train_target_exploded = explode_train_target(train_target)
+    #     train_emb_df = pd.DataFrame()
+    #     train_emb_df['emb'] = [np.array(e) for e in train_emb]
+    #     train_emb_df = pd.concat([train_target_exploded, train_emb_df], axis=1)
+    #     print('merging on NOTE_ID_SEQ...')
+    #     train_emb_seq = merge_embs_to_seq(train_target, train_embs=train_emb_df)
+    #     validate_train_emb_seq(train_emb_seq, train_target)
+    #     train_emb_seq.to_csv(train_emb_seq_path, index=False)
+    # else:
+    #     print('train_embs_seq exists!')
+    #     train_emb_seq = pd.read_csv(train_emb_seq_path, converters={'emb_seq': convert_to_nested_list})
+    #     # breakpoint()
 
     # ===== Train LSTM ===== 
     RUN_NAME = f'{MODEL_NAME}_{args.note_type[:3]}_{args.noteid_mode}_{RUN_CNTR}'
@@ -264,7 +283,8 @@ if __name__ == '__main__':
     batch_size = args.batch_size
     train_epoch = args.num_epochs
 
-    out = finetune(train_emb_seq, lr, batch_size, train_epoch)
+    out = finetune(train_target, train_emb, lr, batch_size, train_epoch)
+    # out = finetune(train_target, train_embs, lr, batch_size, train_epoch)
     # breakpoint()
     # ===== Save Sequential Embeddings =====
     # extract_emb_seq()
