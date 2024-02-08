@@ -47,7 +47,6 @@ def do_tokenization(train : pd.DataFrame, train_idxs : List[int],
 
 
     # FIXME get text
-    # breakpoint()
     train_data = Dataset.from_pandas(train_data).select_columns(['text', 'label'])
     val_data = Dataset.from_pandas(val_data).select_columns(['text', 'label'])
 
@@ -70,6 +69,7 @@ def do_tokenization(train : pd.DataFrame, train_idxs : List[int],
 
     train_data.set_format('torch', columns=['input_ids', 'attention_mask', 'label'])
     val_data.set_format('torch', columns=['input_ids', 'attention_mask', 'label'])
+
     train_data = train_data.remove_columns('text')
     val_data = val_data.remove_columns('text')
 
@@ -137,9 +137,9 @@ if __name__ == '__main__':
     print(f'created all dirs in model_out_dir', model_out_dir)
 
     from transformers import AutoTokenizer, T5Config, AutoConfig, LongformerTokenizerFast, AutoModelForSequenceClassification, AutoModel, LongformerForSequenceClassification
-    from BoXHED_Fuse.models.T5EncoderForSequenceClassification import T5EncoderForSequenceClassification
+    from BoXHED_Fuse.models.T5EncoderForSequenceClassification import T5EncoderForSequenceClassification, T5EncoderForSequenceRegression
     from BoXHED_Fuse.models.ClinicalLongformerForSequenceClassification import ClinicalLongformerForSequenceClassification
-    tokenizer, classifier = None, None
+    tokenizer, head = None, None
     if args.target == 'time_until_event':
         num_labels = 1
     elif args.target == 'delta_in_2_days':
@@ -154,7 +154,7 @@ if __name__ == '__main__':
 
 
         if args.ckpt_model_path:
-            classifier = torch.load(args.ckpt_model_path)
+            head = torch.load(args.ckpt_model_path)
             print('loaded model from ckpt model path:', args.ckpt_model_path)
         else:
             model = AutoModel.from_pretrained(model_dir)
@@ -162,13 +162,16 @@ if __name__ == '__main__':
             config_new = encoder.config
             config_new.num_labels=num_labels
             config_new.last_hidden_size=64
-            classifier = T5EncoderForSequenceClassification(encoder, config_new)
+            if num_labels == 1:
+                head = T5EncoderForSequenceRegression(encoder, config_new)
+            else:
+                head = T5EncoderForSequenceClassification(encoder, config_new)
 
     elif args.model_type == 'Longformer':
         model_path = "yikuan8/Clinical-Longformer"
         tokenizer = LongformerTokenizerFast.from_pretrained(model_path)
         if args.ckpt_model_path:
-            classifier = torch.load(args.ckpt_model_path)
+            head = torch.load(args.ckpt_model_path)
             print('loaded model from ckpt model path:', args.ckpt_model_path)
         else:
             from transformers import AutoModel
@@ -178,7 +181,7 @@ if __name__ == '__main__':
             config_new.num_labels=num_labels
             config_new.last_hidden_size=64
             config_new.gradient_checkpointing=True
-            classifier = ClinicalLongformerForSequenceClassification(longformer, config_new)
+            head = ClinicalLongformerForSequenceClassification(longformer, config_new)
     else:
         raise ValueError("incorrect model_type specified. Should be T5 or Longformer")
 
@@ -188,7 +191,6 @@ if __name__ == '__main__':
 
     if args.noteid_mode == 'all':
         print(f'noteid_mode {args.noteid_mode}: exploding NOTE_ID_SEQ')
-        # breakpoint()
         train = explode_train_target(train)
 
     # if args.note_type == 'radiology':
@@ -238,7 +240,7 @@ if __name__ == '__main__':
     from BoXHED_Fuse.src.MyTrainer import MyTrainer
 
     trainer = MyTrainer(
-        model=classifier,
+        model=head,
         args=training_args,
         compute_metrics=compute_metrics,
         train_dataset=train_data,
@@ -258,7 +260,6 @@ if __name__ == '__main__':
         wandb.run.name = training_args.run_name
         print(wandb.run.get_url())
 
-    breakpoint()
     trainer.train()
     # torch.save(trainer.best_model, f'{out_dir}/besls
     # t_model.pt')

@@ -39,14 +39,14 @@ class MyTrainer(Trainer):
     def compute_loss(self, model, inputs, return_outputs=False):
         labels = inputs.get("labels")
         outputs = model.forward(**inputs)
-        print("model: ", model)
 
         logits = outputs.get('logits')
         loss = outputs.get('loss')
 
-        num_labels = self.model.config.num_labels
-        labels_onehot = torch.zeros(labels.size(0), num_labels, device=labels.device)  # Create an empty tensor for one-hot encoding
-        labels_onehot.scatter_(1, labels.unsqueeze(1), 1)  # Perform one-hot encoding
+        # num_labels = self.model.config.num_labels
+        # if num_labels > 1:
+        #     labels_onehot = torch.zeros(labels.size(0), num_labels, device=labels.device)  # Create an empty tensor for one-hot encoding
+        #     labels_onehot.scatter_(1, labels.unsqueeze(1), 1)  # Perform one-hot encoding
 
         # loss_fct = nn.BCEWithLogitsLoss()
 #         print(f'logits: {logits},\
