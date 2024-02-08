@@ -3,6 +3,7 @@ import pandas as pd
 import os
 import torch.nn as nn
 import time
+import sys
 from torch.utils.data import DataLoader
 from torch.utils import data
 import torch
@@ -19,10 +20,6 @@ from BoXHED_Fuse.src.log_artifact import log_artifact
 from BoXHED_Fuse.src.helpers import find_next_dir_index, merge_embs_to_seq, convert_to_list, convert_to_nested_list, compute_metrics_LSTM, Sequential_Dataset, Sequential_Dataset_FAST, group_train_val, explode_train_target, validate_train_emb_seq
 from BoXHED_Fuse.src.MyTrainer import MyTrainer 
 from BoXHED_Fuse.models.ClinicalLSTM import ClinicalLSTM
-import copy
-# from Ranger import Ranger
-
-
 
 
 def test_finetune(data_generator, model):
@@ -61,14 +58,14 @@ def test_finetune(data_generator, model):
 
     return metrics, y_pred, loss.item()
 
-def finetune(train_target, train_emb, lr, batch_size, train_epoch, use_scheduler=False):
+def finetune(train_target, train_emb, lr, batch_size, train_epoch, max_num_notes=32, use_scheduler=False, bidirectional=False):
     '''
     finetune the LSTM.
     '''
-    
+    epochs_no_improvement = 0
+    min_val_loss = sys.maxsize
     loss_history = []
-    
-    model = ClinicalLSTM()
+    model = ClinicalLSTM(bidirectional)
     model.cuda()
     
     if torch.cuda.device_count() > 1:
@@ -89,10 +86,10 @@ def finetune(train_target, train_emb, lr, batch_size, train_epoch, use_scheduler
     train_data = train_target.iloc[train_idxs]
     val_data = train_target.iloc[val_idxs]
 
-    training_set = Sequential_Dataset_FAST(train_data, train_target_exploded, train_emb)
+    training_set = Sequential_Dataset_FAST(train_data, train_target_exploded, train_emb, max_num_notes)
     training_generator = data.DataLoader(training_set, **params)
 
-    validation_set = Sequential_Dataset_FAST(val_data, train_target_exploded, train_emb)
+    validation_set = Sequential_Dataset_FAST(val_data, train_target_exploded, train_emb, max_num_notes)
     validation_generator = data.DataLoader(validation_set, **params)
     
     opt = torch.optim.Adam(model.parameters(), lr = lr)
@@ -113,20 +110,20 @@ def finetune(train_target, train_emb, lr, batch_size, train_epoch, use_scheduler
             loss_fct = torch.nn.BCELoss()
             m = torch.nn.Sigmoid()
             logits = torch.flatten(torch.squeeze(m(score)))
-            loss = loss_fct(logits, label)
-            loss_history.append(loss.item())
+            val_loss = loss_fct(logits, label)
+            loss_history.append(val_loss.item())
 
             if args.use_wandb:
                 wandb.log({
-                    "Train Step Loss": loss.item(),
+                    "Train Step Loss": val_loss.item(),
                     'Learning Rate': opt.param_groups[0]['lr'],
                     'Epoch': epo + (i+1) / (len(training_generator) - 1)})
-            print("Train Step Loss", loss.item(),
+            print("Train Step Loss", val_loss.item(),
                     'Learning Rate', opt.param_groups[0]['lr'],
                     'Epoch', epo + (i+1) / (len(training_generator) - 1),
                     'Time', int(time.time() - tstart))
             opt.zero_grad()
-            loss.backward()
+            val_loss.backward()
             opt.step()
             if use_scheduler:
                 scheduler.step()
@@ -136,10 +133,9 @@ def finetune(train_target, train_emb, lr, batch_size, train_epoch, use_scheduler
         # every epoch test
         with torch.set_grad_enabled(False):
             # return test_finetune(validation_generator, model)
-            metrics, logits, loss = test_finetune(validation_generator, model)
-                 
+            metrics, logits, val_loss = test_finetune(validation_generator, model)
             if args.use_wandb:
-                wandb.log({"Validation Loss": loss, "AUC": metrics['auc'], "AUPRC": metrics['auprc']})
+                wandb.log({"Validation Loss": val_loss, "AUC": metrics['auc'], "AUPRC": metrics['auprc']})
             print('Validation at Epoch '+ str(epo + 1) + ' , AUC: '+ str(metrics['auc']) + ' , AUPRC: ' + str(metrics['auprc']))
 
         if not args.sweep:
@@ -147,10 +143,17 @@ def finetune(train_target, train_emb, lr, batch_size, train_epoch, use_scheduler
                 'epoch': epo,
                 'model_state_dict' : model.state_dict(),
                 'optimizer_state_dict' : opt.state_dict(),
-                'loss': loss,
+                'loss': val_loss,
             }, f'{model_out_dir}/model_checkpoint_epoch{epo+1}.pt')
             print(f'saved checkpoint {epo+1} to {model_out_dir}/model_checkpoint_epoch{epo}.pt')
 
+        if val_loss >= min_val_loss - .01:
+            epochs_no_improvement += 1
+            if epochs_no_improvement == 2:
+                break
+        else:
+            epochs_no_improvement = 0
+        min_val_loss = min(val_loss, min_val_loss)
     return loss_history
 
 def sweep_func():
@@ -163,7 +166,9 @@ def sweep_func():
             lr=config.lr, 
             batch_size=config.batch_size,
             train_epoch=10, 
-            use_scheduler=config.scheduler)
+            max_num_notes=config.max_num_notes,
+            use_scheduler=config.scheduler,
+            bidirectional=config.bidirectional)
     except Exception as e:
         print(f"An error occurred: {e}")
         traceback.print_exc()
@@ -173,7 +178,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--test', action='store_true', help='enable testing mode')
     parser.add_argument('--use-wandb', action = 'store_true', help = 'enable wandb', default=False)
-    parser.add_argument('--sweep', action = 'store_true', help = 'enable sweep, do not store checkpoints (BAYESIAN SWEEPS RUN FOREVER UNTIL MANUALLY STOPPED)', default=False)
     parser.add_argument('--gpu-no', dest = 'GPU_NO', help='use GPU_NO specified (this may be a single number or several. eg: 1 or 1,2,3,4)')
     parser.add_argument('--note-type', dest = 'note_type', help='which notes, radiology or discharge?')
     parser.add_argument('--num-epochs', dest = 'num_epochs', help = 'num_epochs to train', type=int)
@@ -181,6 +185,8 @@ if __name__ == '__main__':
     parser.add_argument('--embs-dir', dest = 'embs_dir', help = 'dir of train.pt containing embeddings')
     parser.add_argument('--batch-size', dest = 'batch_size', default=4, type=int)
     parser.add_argument('--use-scheduler', action = 'store_true', help = 'whether or not to use scheduler', default=False)
+    parser.add_argument('--sweep', action = 'store_true', help = 'enable sweep, do not store checkpoints (BAYESIAN SWEEPS RUN FOREVER UNTIL MANUALLY STOPPED)', default=False)
+    parser.add_argument('--sweep-id', dest = 'sweep_id', help = 'what sweep to attach to. If not specified, create a new sweep')
 
     args = parser.parse_args()
     assert(os.path.exists(args.embs_dir))
@@ -188,18 +194,15 @@ if __name__ == '__main__':
         args.use_wandb = True
 
     train_target_path = f'{os.getenv("BHF_ROOT")}/JSS_SUBMISSION_NEW/data/targets/till_end_mimic_iv_extra_features_train_NOTE_TARGET_2_{args.note_type[:3]}_{args.noteid_mode}.csv'
-
     MODEL_NAME = 'Clinical-LSTM'
     model_out_dir = f'{os.getenv("BHF_ROOT")}/model_outputs/{MODEL_NAME}_{args.note_type[:3]}_{args.noteid_mode}_out'
     
     if args.test:
         train_target_path = os.path.join(os.path.dirname(train_target_path), 'testing', os.path.basename(train_target_path)) 
         model_out_dir = os.path.join(os.path.dirname(model_out_dir), 'testing', os.path.basename(model_out_dir))
-    
     train_emb_seq_path = f'{model_out_dir}/train_emb_seq.csv' # tmp csv for multiple runs
-
     
-    if not os.path.exists(model_out_dir):
+    if not os.path.exists(model_out_dir) and not args.sweep:
         os.makedirs(model_out_dir)
 
     RUN_CNTR = find_next_dir_index(model_out_dir)
@@ -223,30 +226,53 @@ if __name__ == '__main__':
     # ===== Train LSTM ===== 
     RUN_NAME = f'{MODEL_NAME}_{args.note_type[:3]}_{args.noteid_mode}_{RUN_CNTR}'
     PROJECT_NAME = 'BoXHED_Fuse'
+
+    # ==== SWEEP 1 ====
+    # sweep_configuration = {
+    #     "method" : "bayes",
+    #     "name": f"sweep_{RUN_NAME}",
+    #     "metric": {"goal": "minimize", "name": "Validation Loss"},
+    #     "parameters": {
+    #         "batch_size": {"values": [64, 128, 256]},
+    #         "lr": {"max": 1e-4, 
+    #                 "min":  1e-6},
+    #         "scheduler": {"values" : [True, False]}
+    #     },
+    # }
+
+    # ==== SWEEP 2 ==== 
+    sweep_configuration = {
+        "method" : "grid",
+        "name": f"sweep2_{RUN_NAME}",
+        "metric": {"goal": "minimize", "name": "Validation Loss"},  
+        "parameters": {
+            "batch_size": {"values": [128]},
+            "lr": {"values": [7e-5]},
+            "scheduler": {"values": [True]},
+            "max_num_notes": {"values": [6,16,32]},
+            "bidirectional": {"values" : [True, False]}
+        },  
+    }
+
+
     
     if args.use_wandb:
         # wandb.login(key=os.getenv('WANDB_KEY_PERSONAL'), relogin = True)
         wandb.login(key=os.getenv('WANDB_KEY_TAMU'), relogin = True)
     if args.sweep:
-        sweep_configuration = {
-            "method" : "bayes",
-            "name": f"sweep_{RUN_NAME}",
-            "metric": {"goal": "minimize", "name": "Validation Loss"},
-            "parameters": {
-                "batch_size": {"values": [64, 128, 256]},
-                "lr": {"max": 1e-4, 
-                       "min":  1e-6},
-                "scheduler": {"values" : [True, False]}
-            },
-        }
-        sweep_id = wandb.sweep(sweep=sweep_configuration, project=PROJECT_NAME)
-        wandb.agent(sweep_id=sweep_id, function=sweep_func, count = 4)
+        if args.sweep_id:
+            print('Creating parallel agent on existing sweep with ID', args.sweep_id)
+            wandb.agent(sweep_id=args.sweep_id, function=sweep_func, project=PROJECT_NAME)
+        else:
+            sweep_id = wandb.sweep(sweep=sweep_configuration, project=PROJECT_NAME)
+            print('Starting new sweep with ID', sweep_id)
+            wandb.agent(sweep_id=sweep_id, function=sweep_func)
 
     else:
         if args.use_wandb:
             wandb.init(project=PROJECT_NAME, name=RUN_NAME)
 
-        lr = 1e-5
+        lr = 7e-5
         batch_size = args.batch_size
         train_epoch = args.num_epochs
         out = finetune(train_target, train_emb, lr, batch_size, train_epoch, use_scheduler=args.use_scheduler)

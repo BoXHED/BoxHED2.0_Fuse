@@ -135,7 +135,17 @@ def compute_metrics(pred) -> Dict[str, float]:
     #pred.predictions.argmax(-1)
     precision, recall, f1, _ = precision_recall_fscore_support(labels, preds, average='binary')
     acc = accuracy_score(labels, preds)
+
+    try:
+        auc = roc_auc_score(labels, preds)
+    except ValueError as e:
+        print(f"Error: {e}")
+        auc = None
+
+    auprc = average_precision_score(labels, preds)
     return {
+        'auc' : auc,
+        'auprc' : auprc,
         'accuracy': acc,
         'f1': f1,
         'precision': precision,
@@ -164,15 +174,15 @@ def compute_metrics_LSTM(labels, preds) -> Dict[str, float]:
 
 from torch.utils import data
 # maximum sequence length
-max_num_notes = 32
 # doc_emb_size = 64 # 768
     
 class Sequential_Dataset(data.Dataset):
 
-    def __init__(self, ds, doc_emb_size):
+    def __init__(self, ds, doc_emb_size, max_num_notes):
         'Initialization'
         self.doc_emb_size = doc_emb_size
         self.ds = ds
+        self.max_num_notes = max_num_notes
 
     def __len__(self):
         'Denotes the total number of samples'
@@ -187,12 +197,12 @@ class Sequential_Dataset(data.Dataset):
         t0 = time.time()       
         y = self.ds['label'][index]
         emb_seq = self.ds['emb_seq'][index]
-        emb_seq_out = torch.zeros(size=(max_num_notes, self.doc_emb_size), dtype=torch.float)  
+        emb_seq_out = torch.zeros(size=(self.max_num_notes, self.doc_emb_size), dtype=torch.float)  
 
         print(f'emb_seq_out (zeroos) took {time.time() - t0} seconds')
         t0 = time.time()
-        if len(emb_seq) > max_num_notes:
-            emb_seq_out[:max_num_notes] = emb_seq[:max_num_notes]
+        if len(emb_seq) > self.max_num_notes:
+            emb_seq_out[:self.max_num_notes] = emb_seq[:self.max_num_notes]
         else:
             emb_seq_out[:len(emb_seq)] = emb_seq
         
@@ -202,12 +212,13 @@ class Sequential_Dataset(data.Dataset):
     
 class Sequential_Dataset_FAST(data.Dataset):
 
-    def __init__(self, train_target, train_target_exploded, train_emb):
+    def __init__(self, train_target, train_target_exploded, train_emb, max_num_notes):
         'Initialization'
         self.train_target = train_target
         self.train_target_exploded = train_target_exploded
         self.train_embs = train_emb
         self.doc_emb_size = train_emb.shape[1] # 64
+        self.max_num_notes = max_num_notes
 
     def __len__(self):
         'Denotes the total number of samples'
@@ -226,11 +237,11 @@ class Sequential_Dataset_FAST(data.Dataset):
         emb_seq = self.train_embs[exploded_idx.index]
         # print(f'getting emb_seq took {time.time() - t0} seconds')
 
-        emb_seq_out = torch.zeros(size=(max_num_notes, self.doc_emb_size), dtype=torch.float)  
+        emb_seq_out = torch.zeros(size=(self.max_num_notes, self.doc_emb_size), dtype=torch.float)  
         # print(f'emb_seq_out (zeros) took {time.time() - t0} seconds')
         # t0 = time.time()
-        if len(emb_seq) > max_num_notes:
-            emb_seq_out[:max_num_notes] = emb_seq[:max_num_notes]
+        if len(emb_seq) > self.max_num_notes:
+            emb_seq_out[:self.max_num_notes] = emb_seq[:self.max_num_notes]
         else:
             emb_seq_out[:len(emb_seq)] = emb_seq
         

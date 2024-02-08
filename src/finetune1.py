@@ -14,13 +14,7 @@ import os
 import argparse
 from functools import partial
 
-from BoXHED_Fuse.src.helpers import tokenization,
-convert_to_list, 
-find_next_dir_index, 
-load_all_notes, 
-explode_train_target, 
-compute_metrics, 
-group_train_val
+from BoXHED_Fuse.src.helpers import tokenization, convert_to_list, find_next_dir_index, load_all_notes, explode_train_target, compute_metrics, group_train_val
 
 
 '''
@@ -53,7 +47,7 @@ def do_tokenization(train : pd.DataFrame, train_idxs : List[int],
 
 
     # FIXME get text
-
+    # breakpoint()
     train_data = Dataset.from_pandas(train_data).select_columns(['text', 'label'])
     val_data = Dataset.from_pandas(val_data).select_columns(['text', 'label'])
 
@@ -97,6 +91,8 @@ if __name__ == '__main__':
     parser.add_argument('--ckpt-dir', dest = 'ckpt_dir', help = 'ckpt directory to load trainer from')
     parser.add_argument('--ckpt-model-path', dest = 'ckpt_model_path', help = 'ckpt path to load model from') # change this to artifact
     parser.add_argument('--noteid-mode', dest = 'noteid_mode', help = 'kw: all or recent')
+    parser.add_argument('--target', dest = 'target', help = 'what target are we using? -1 for time_until_event, 2 for categorical "delta_in_2_days')
+
     # FIXME add target name functionality!!!
     args = parser.parse_args()
     args.num_epochs = int(args.num_epochs)
@@ -105,6 +101,7 @@ if __name__ == '__main__':
     assert(args.model_name in ['Clinical-T5-Base', 'Clinical-T5-Large', 'Clinical-T5-Sci', 'Clinical-T5-Scratch', 'yikuan8/Clinical-Longformer'])
     assert(args.model_type in ['T5', 'Longformer'])
     assert(args.noteid_mode in ['recent', 'all'])
+    assert(args.target in ['time_until_event', 'delta_in_2_days'])
     # assert(os.path.exists(args.ckpt_dir))
     # assert(os.path.exists(args.ckpt_model_path))
 
@@ -114,7 +111,11 @@ if __name__ == '__main__':
 
     os.environ["CUDA_VISIBLE_DEVICES"] = args.GPU_NO
 
-    train_path = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/targets/till_end_mimic_iv_extra_features_train_NOTE_TARGET_2_{args.note_type[:3]}_{args.noteid_mode}.csv'
+    if args.target == 'time_until_event':
+        frog = -1
+    elif args.target == 'delta_in_2_days':
+        frog = 2
+    train_path = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/targets/till_end_mimic_iv_extra_features_train_NOTE_TARGET_{frog}_{args.note_type[:3]}_{args.noteid_mode}.csv'
     print(f'read from {train_path}')
 
     model_out_dir = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/BoXHED_Fuse/model_outputs/{args.model_name}_{args.note_type[:3]}_{args.noteid_mode}_out'
@@ -139,10 +140,15 @@ if __name__ == '__main__':
     from BoXHED_Fuse.models.T5EncoderForSequenceClassification import T5EncoderForSequenceClassification
     from BoXHED_Fuse.models.ClinicalLongformerForSequenceClassification import ClinicalLongformerForSequenceClassification
     tokenizer, classifier = None, None
+    if args.target == 'time_until_event':
+        num_labels = 1
+    elif args.target == 'delta_in_2_days':
+        num_labels = 2
+
     if args.model_type == 'T5':
         from transformers import AutoModelForSeq2SeqLM, AutoModel
-
-        model_dir = os.path.join('BoXHED_Fuse/models', args.model_name)
+        
+        model_dir = os.path.join('/home/ugrads/a/aa_ron_su/BoXHED_Fuse/BoXHED_Fuse/models', args.model_name)
         tokenizer = AutoTokenizer.from_pretrained(model_dir)
         # tokenizer = AutoTokenizer.from_pretrained(args.model_name)
 
@@ -154,7 +160,7 @@ if __name__ == '__main__':
             model = AutoModel.from_pretrained(model_dir)
             encoder = model.get_encoder() # we only need the clinical-t5 encoder for our purposes
             config_new = encoder.config
-            config_new.num_labels=2
+            config_new.num_labels=num_labels
             config_new.last_hidden_size=64
             classifier = T5EncoderForSequenceClassification(encoder, config_new)
 
@@ -166,10 +172,10 @@ if __name__ == '__main__':
             print('loaded model from ckpt model path:', args.ckpt_model_path)
         else:
             from transformers import AutoModel
-            model = AutoModelForSequenceClassification.from_pretrained(model_path, num_labels = 2, gradient_checkpointing = True)
+            model = AutoModelForSequenceClassification.from_pretrained(model_path, num_labels = num_labels, gradient_checkpointing = True)
             longformer = model.get_submodule('longformer')
             config_new = longformer.config
-            config_new.num_labels=2
+            config_new.num_labels=num_labels
             config_new.last_hidden_size=64
             config_new.gradient_checkpointing=True
             classifier = ClinicalLongformerForSequenceClassification(longformer, config_new)
@@ -178,8 +184,7 @@ if __name__ == '__main__':
 
     print(f"reading notes and target from {train_path}")
     train = pd.read_csv(train_path, converters = {'NOTE_ID_SEQ': convert_to_list})
-    target = 'delta_in_2_days' # FIXME
-    train = train.rename(columns = {target:'label'})
+    train = train.rename(columns = {args.target:'label'})
 
     if args.noteid_mode == 'all':
         print(f'noteid_mode {args.noteid_mode}: exploding NOTE_ID_SEQ')
@@ -198,12 +203,8 @@ if __name__ == '__main__':
 
     # join train with all_notes
     train = pd.merge(train, all_notes[['NOTE_ID','text']], on='NOTE_ID', how='left')
-    # breakpoint()
-
     train_idxs, val_idxs = group_train_val(train['ICUSTAY_ID'])
     train_data, val_data = do_tokenization(train, train_idxs, val_idxs)
-    # breakpoint()
-
 
     # define the training arguments
     training_args = TrainingArguments(
@@ -257,6 +258,7 @@ if __name__ == '__main__':
         wandb.run.name = training_args.run_name
         print(wandb.run.get_url())
 
+    breakpoint()
     trainer.train()
     # torch.save(trainer.best_model, f'{out_dir}/besls
     # t_model.pt')
