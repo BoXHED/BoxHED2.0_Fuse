@@ -2,6 +2,7 @@ from transformers import Trainer
 from transformers.modeling_utils import unwrap_model
 import torch
 from torch import nn
+from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
 
 class MyTrainer(Trainer):
     def __init__(self, model, args, train_dataset=None, eval_dataset=None,
@@ -38,10 +39,37 @@ class MyTrainer(Trainer):
 # class MultilabelTrainer(Trainer):
     def compute_loss(self, model, inputs, return_outputs=False):
         labels = inputs.get("labels")
+        breakpoint()
         outputs = model.forward(**inputs)
 
         logits = outputs.get('logits')
-        loss = outputs.get('loss')
+        # loss = outputs.get('loss')
+
+        if labels is not None:
+            # if self.config.problem_type is None:
+            #     if self.num_labels == 1:
+            #         self.config.problem_type = "regression"
+            #     elif self.num_labels > 1 and (labels.dtype == torch.long or labels.dtype == torch.int):
+            #         self.config.problem_type = "single_label_classification"
+            #     else:
+            #         self.config.problem_type = "multi_label_classification"
+
+            # if self.config.problem_type == "regression":
+            loss_fct = MSELoss()
+            num_labels = model.config.num_labels
+            if num_labels == 1:
+                loss = loss_fct(logits.float().view(-1, self.model.config.num_labels), 
+                                labels.float().view(-1, self.model.config.num_labels))
+                breakpoint()
+                print(f'loss: {loss}')
+            # else:
+            #     loss = loss_fct(logits, labels)
+            # elif self.config.problem_type == "single_label_classification":
+            #     loss_fct = CrossEntropyLoss()
+            #     loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
+            # elif self.config.problem_type == "multi_label_classification":
+            #     loss_fct = BCEWithLogitsLoss()
+            #     loss = loss_fct(logits, labels)
 
         # num_labels = self.model.config.num_labels
         # if num_labels > 1:
@@ -56,7 +84,6 @@ class MyTrainer(Trainer):
         # loss = loss_fct(logits.view(-1, self.model.config.num_labels),
         #                 labels_onehot.float().view(-1, self.model.config.num_labels))
         
-        print(f'loss: {loss}')
         return (loss, outputs) if return_outputs else loss
 
 
