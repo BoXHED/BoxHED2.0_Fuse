@@ -7,7 +7,11 @@ logs_test/*
 wandb
 old_data/*
 views
+viewer*.ipynb
 
+scripts
+model_outputs
+clinicalXLNet
 Clinical-Longformer_out
 Clinical-Longformer_rad_out
 Clinical-Longformer_rad_test_out
@@ -27,4 +31,11 @@ model_test
 model_from_ckpt*
 model
 
-models/*
+Clinical-T5-Base  
+Clinical-T5-Large  
+Clinical-T5-Sci  
+Clinical-T5-Scratch
+
+
+BoXHED_Fuse.egg-info
+settings.json

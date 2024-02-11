@@ -1,0 +1,15 @@
+method: bayes
+name: sweep_RUN_NAME
+metric:
+  goal: minimize
+  name: Validation Loss
+parameters:
+  batch_size:
+    values: [64, 128, 256]
+  lr:
+    max: 1e-4
+    min: 1e-6
+  scheduler:
+    values: [true, false]
+  max_seq_len: 
+    values: [2,6,16,32]
