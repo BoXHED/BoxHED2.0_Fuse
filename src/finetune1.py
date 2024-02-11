@@ -118,7 +118,7 @@ if __name__ == '__main__':
     train_path = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/targets/till_end_mimic_iv_extra_features_train_NOTE_TARGET_{frog}_{args.note_type[:3]}_{args.noteid_mode}.csv'
     print(f'read from {train_path}')
 
-    model_out_dir = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/BoXHED_Fuse/model_outputs/{args.model_name}_{args.note_type[:3]}_{args.noteid_mode}_out'
+    model_out_dir = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/BoXHED_Fuse/model_outputs/{args.model_name}_TARGET_{frog}_{args.note_type[:3]}_{args.noteid_mode}_out'
     data_cache_dir = os.path.join(model_out_dir, 'data_cache')
 
     if args.test:
@@ -137,9 +137,9 @@ if __name__ == '__main__':
     print(f'created all dirs in model_out_dir', model_out_dir)
 
     from transformers import AutoTokenizer, T5Config, AutoConfig, LongformerTokenizerFast, AutoModelForSequenceClassification, AutoModel, LongformerForSequenceClassification
-    from BoXHED_Fuse.models.T5EncoderForSequenceClassification import T5EncoderForSequenceClassification, T5EncoderForSequenceRegression
+    from BoXHED_Fuse.models.T5EncoderForSequenceClassification import T5EncoderWithHead
     from BoXHED_Fuse.models.ClinicalLongformerForSequenceClassification import ClinicalLongformerForSequenceClassification
-    tokenizer, head = None, None
+    tokenizer, full_model = None, None
     if args.target == 'time_until_event':
         num_labels = 1
     elif args.target == 'delta_in_2_days':
@@ -154,7 +154,7 @@ if __name__ == '__main__':
 
 
         if args.ckpt_model_path:
-            head = torch.load(args.ckpt_model_path)
+            full_model = torch.load(args.ckpt_model_path)
             print('loaded model from ckpt model path:', args.ckpt_model_path)
         else:
             model = AutoModel.from_pretrained(model_dir)
@@ -162,16 +162,13 @@ if __name__ == '__main__':
             config_new = encoder.config
             config_new.num_labels=num_labels
             config_new.last_hidden_size=64
-            if num_labels == 1:
-                head = T5EncoderForSequenceRegression(encoder, config_new)
-            else:
-                head = T5EncoderForSequenceClassification(encoder, config_new)
+            full_model = T5EncoderWithHead(encoder, config_new)
 
     elif args.model_type == 'Longformer':
         model_path = "yikuan8/Clinical-Longformer"
         tokenizer = LongformerTokenizerFast.from_pretrained(model_path)
         if args.ckpt_model_path:
-            head = torch.load(args.ckpt_model_path)
+            full_model = torch.load(args.ckpt_model_path)
             print('loaded model from ckpt model path:', args.ckpt_model_path)
         else:
             from transformers import AutoModel
@@ -181,7 +178,7 @@ if __name__ == '__main__':
             config_new.num_labels=num_labels
             config_new.last_hidden_size=64
             config_new.gradient_checkpointing=True
-            head = ClinicalLongformerForSequenceClassification(longformer, config_new)
+            full_model = ClinicalLongformerForSequenceClassification(longformer, config_new)
     else:
         raise ValueError("incorrect model_type specified. Should be T5 or Longformer")
 
@@ -204,7 +201,8 @@ if __name__ == '__main__':
     all_notes = load_all_notes(args.note_type)
 
     # join train with all_notes
-    train = pd.merge(train, all_notes[['NOTE_ID','text']], on='NOTE_ID', how='left')
+    if 'text' not in train.columns:
+        train = pd.merge(train, all_notes[['NOTE_ID','text']], on='NOTE_ID', how='left')
     train_idxs, val_idxs = group_train_val(train['ICUSTAY_ID'])
     train_data, val_data = do_tokenization(train, train_idxs, val_idxs)
 
@@ -240,7 +238,7 @@ if __name__ == '__main__':
     from BoXHED_Fuse.src.MyTrainer import MyTrainer
 
     trainer = MyTrainer(
-        model=head,
+        model=full_model,
         args=training_args,
         compute_metrics=compute_metrics,
         train_dataset=train_data,
@@ -259,6 +257,8 @@ if __name__ == '__main__':
         wandb.init(project='BoXHED_Fuse', name=training_args.run_name, resume=resume)
         wandb.run.name = training_args.run_name
         print(wandb.run.get_url())
+    else:
+        wandb.init(mode='offline')
 
     trainer.train()
     # torch.save(trainer.best_model, f'{out_dir}/besls

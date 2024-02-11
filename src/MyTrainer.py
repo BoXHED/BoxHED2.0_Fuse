@@ -39,13 +39,12 @@ class MyTrainer(Trainer):
 # class MultilabelTrainer(Trainer):
     def compute_loss(self, model, inputs, return_outputs=False):
         labels = inputs.get("labels")
-        breakpoint()
         outputs = model.forward(**inputs)
 
         logits = outputs.get('logits')
-        # loss = outputs.get('loss')
+        loss = outputs.get('loss')
 
-        if labels is not None:
+        # if labels is not None:
             # if self.config.problem_type is None:
             #     if self.num_labels == 1:
             #         self.config.problem_type = "regression"
@@ -55,13 +54,10 @@ class MyTrainer(Trainer):
             #         self.config.problem_type = "multi_label_classification"
 
             # if self.config.problem_type == "regression":
-            loss_fct = MSELoss()
-            num_labels = model.config.num_labels
-            if num_labels == 1:
-                loss = loss_fct(logits.float().view(-1, self.model.config.num_labels), 
-                                labels.float().view(-1, self.model.config.num_labels))
-                breakpoint()
-                print(f'loss: {loss}')
+            # loss_fct = MSELoss()
+            # if num_labels == 1:
+            #     loss = loss_fct(logits.float().view(-1, self.model.config.num_labels), 
+            #                     labels.float().view(-1, self.model.config.num_labels))
             # else:
             #     loss = loss_fct(logits, labels)
             # elif self.config.problem_type == "single_label_classification":
@@ -77,13 +73,14 @@ class MyTrainer(Trainer):
         #     labels_onehot.scatter_(1, labels.unsqueeze(1), 1)  # Perform one-hot encoding
 
         # loss_fct = nn.BCEWithLogitsLoss()
-#         print(f'logits: {logits},\
-# labels: {labels}')
-#         print(f'logits view: {logits.view(-1, self.model.config.num_labels)},\
-# labels view: {labels.float().view(-1, self.model.config.num_labels)}')
+        # print(f'logits: {logits},\
+        #     labels: {labels}')
+        # print(f'logits view: {logits.view(-1, self.model.config.num_labels)},\
+        #     labels view: {labels.float().view(-1, self.model.config.num_labels)}')
         # loss = loss_fct(logits.view(-1, self.model.config.num_labels),
         #                 labels_onehot.float().view(-1, self.model.config.num_labels))
         
+        print(f'loss: {loss}')
         return (loss, outputs) if return_outputs else loss
 
 
