@@ -10,6 +10,7 @@ class MyTrainer(Trainer):
         super().__init__(model, args, train_dataset=train_dataset,
                          eval_dataset=eval_dataset, tokenizer=tokenizer,
                          compute_metrics=compute_metrics)
+        self.args = args
         print(self)
         # Add any additional setup code specific to your OwnTrainer class here
 
@@ -20,15 +21,17 @@ class MyTrainer(Trainer):
         # You can use the `metrics` argument to access the evaluation metrics
         
         # Call the original function
-        super()._save_checkpoint(model, trial, metrics)
 
-        model_out = unwrap_model(model)
-        print(f"I have a model: {model.__class__}")
+        if self.args.save_checkpoint:
+            super()._save_checkpoint(model, trial, metrics)
 
-        epoch = int(round(self.state.epoch))
-        checkpoint_path = f"{self.args.output_dir}/model_checkpoint_epoch{epoch}.pt"
-        print(f"I want to save to: {checkpoint_path}")
-        torch.save(model_out, checkpoint_path)  # Save model state_dict to .pt file
+            model_out = unwrap_model(model)
+            print(f"I have a model: {model.__class__}")
+
+            epoch = int(round(self.state.epoch))
+            checkpoint_path = f"{self.args.output_dir}/model_checkpoint_epoch{epoch}.pt"
+            print(f"I want to save to: {checkpoint_path}")
+            torch.save(model_out, checkpoint_path)  # Save model state_dict to .pt file
     
     # def predict(self, test_dataset, ignore_keys=None):
     #     self.evaluation_loop

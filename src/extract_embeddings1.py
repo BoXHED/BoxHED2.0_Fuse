@@ -8,14 +8,11 @@ from time import time
 import numpy as np
 import torch
 from datasets import Dataset
-from BoXHED_Fuse.src.helpers import tokenization, load_all_notes, find_next_dir_index, explode_train_target, convert_to_list
+from BoXHED_Fuse.src.helpers import tokenization, load_all_notes, find_next_dir_index, explode_train_target, convert_to_list, merge_text
 from functools import partial
 from transformers import LongformerTokenizerFast, AutoTokenizer
 
-def merge_text(data):
-    all_notes = load_all_notes(args.note_type)
-    data = pd.merge(data, all_notes[['NOTE_ID','text']], on='NOTE_ID', how='left')
-    return data
+
 
 def df_to_tokens_ds(data):
     '''
@@ -175,8 +172,8 @@ if __name__ == '__main__':
         train_target_exploded = explode_train_target(train_target_exploded)
         test_target_exploded = explode_train_target(test_target_exploded)
 
-    train_target_exploded = merge_text(train_target_exploded)
-    test_target_exploded = merge_text(test_target_exploded)
+    train_target_exploded = merge_text(train_target_exploded, args.note_type)
+    test_target_exploded = merge_text(test_target_exploded, args.note_type)
     tokenized_train_notes = df_to_tokens_ds(train_target_exploded)
     tokenized_test_notes = df_to_tokens_ds(test_target_exploded)
     print(f'tokenized_train_notes dataset:, {tokenized_train_notes}')

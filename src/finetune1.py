@@ -13,6 +13,7 @@ import wandb
 import os
 import argparse
 from functools import partial
+import traceback
 
 from BoXHED_Fuse.src.helpers import tokenization, convert_to_list, find_next_dir_index, load_all_notes, explode_train_target, compute_metrics, group_train_val
 
@@ -51,21 +52,21 @@ def do_tokenization(train : pd.DataFrame, train_idxs : List[int],
     val_data = Dataset.from_pandas(val_data).select_columns(['text', 'label'])
 
 
-    if not any(os.listdir(data_cache_dir )) :
+    if not any(os.listdir(DATA_CACHE_DIR )) :
         # define a function that will tokenize the model, and will return the relevant inputs for the model
         train_data = train_data.map(partial(tokenization, tokenizer, max_length=512), batched = True, batch_size = len(train_data) // 10)
         val_data = val_data.map(partial(tokenization, tokenizer, max_length=512), batched = True, batch_size = len(val_data) // 10)
 
-        token_path_train = f'{data_cache_dir}/tokenized_train_data'
-        token_path_val = f'{data_cache_dir}/tokenized_val_data'
-        train_data.save_to_disk(token_path_train)
-        val_data.save_to_disk(token_path_val)
-        print(f'saved train, val tokens to {os.path.dirname(token_path_train)}')
+        TOKEN_PATH_TRAIN = f'{DATA_CACHE_DIR}/tokenized_train_data'
+        TOKEN_PATH_VAL = f'{DATA_CACHE_DIR}/tokenized_val_data'
+        train_data.save_to_disk(TOKEN_PATH_TRAIN)
+        val_data.save_to_disk(TOKEN_PATH_VAL)
+        print(f'saved train, val tokens to {os.path.dirname(TOKEN_PATH_TRAIN)}')
 
     else: 
-        print(f'loading train, val from {data_cache_dir}')
-        train_data = train_data.load_from_disk(f'{data_cache_dir}/tokenized_train_data')
-        val_data = val_data.load_from_disk(f'{data_cache_dir}/tokenized_val_data')
+        print(f'loading train, val from {DATA_CACHE_DIR}')
+        train_data = train_data.load_from_disk(f'{DATA_CACHE_DIR}/tokenized_train_data')
+        val_data = val_data.load_from_disk(f'{DATA_CACHE_DIR}/tokenized_val_data')
 
     train_data.set_format('torch', columns=['input_ids', 'attention_mask', 'label'])
     val_data.set_format('torch', columns=['input_ids', 'attention_mask', 'label'])
@@ -75,6 +76,36 @@ def do_tokenization(train : pd.DataFrame, train_idxs : List[int],
 
     return (train_data, val_data)
 
+
+def finetune(trainer):
+    resume = args.ckpt_dir != None
+    wandb.init(project=PROJECT_NAME, name=RUN_NAME, resume=resume)
+    wandb.run.name = RUN_NAME
+    print(wandb.run.get_url())
+
+    trainer.train()
+    # torch.save(trainer.best_model, f'{out_dir}/besls
+    # t_model.pt')
+
+    import logging
+    logging.basicConfig(filename=f'{MODEL_OUT_DIR}/evaluation.log', level=logging.INFO, filemode='w')
+    evaluation_result = trainer.evaluate()
+    logging.info(evaluation_result)
+
+    best_checkpoint_path = trainer.state.best_model_checkpoint
+    logging.info(f"best_checkpoint_path: {best_checkpoint_path}")
+
+    print(f"RUN {RUN_NAME} FINISHED. Out dir: {MODEL_OUT_DIR}")
+
+def sweep_func():
+    wandb.init(project=PROJECT_NAME, name=RUN_NAME)
+    config = wandb.config
+    print('Current wandb.config:', config)
+    try:
+        finetune(trainer = trainer)
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        traceback.print_exc()
 
 
 
@@ -91,17 +122,19 @@ if __name__ == '__main__':
     parser.add_argument('--ckpt-dir', dest = 'ckpt_dir', help = 'ckpt directory to load trainer from')
     parser.add_argument('--ckpt-model-path', dest = 'ckpt_model_path', help = 'ckpt path to load model from') # change this to artifact
     parser.add_argument('--noteid-mode', dest = 'noteid_mode', help = 'kw: all or recent')
-    parser.add_argument('--target', dest = 'target', help = 'what target are we using? -1 for time_until_event, 2 for categorical "delta_in_2_days')
+    parser.add_argument('--target', dest = 'target', help = 'what target are we using? regression "time_until_event", or categorical "delta_in_2_days, or "delta_in_1,3,10,30,100_hours"')
+    parser.add_argument('--sweep', action = 'store_true', help = 'enable sweep, do not store checkpoints (BAYESIAN SWEEPS RUN FOREVER UNTIL MANUALLY STOPPED)', default=False)
+    parser.add_argument('--sweep-id', dest = 'sweep_id', help = 'what sweep to attach to. If not specified, create a new sweep')
 
-    # FIXME add target name functionality!!!
     args = parser.parse_args()
     args.num_epochs = int(args.num_epochs)
+    if args.sweep:
+        args.use_wandb = True
 
     assert(args.note_type in  ['radiology', 'discharge'])
     assert(args.model_name in ['Clinical-T5-Base', 'Clinical-T5-Large', 'Clinical-T5-Sci', 'Clinical-T5-Scratch', 'yikuan8/Clinical-Longformer'])
     assert(args.model_type in ['T5', 'Longformer'])
     assert(args.noteid_mode in ['recent', 'all'])
-    assert(args.target in ['time_until_event', 'delta_in_2_days'])
     # assert(os.path.exists(args.ckpt_dir))
     # assert(os.path.exists(args.ckpt_model_path))
 
@@ -111,43 +144,49 @@ if __name__ == '__main__':
 
     os.environ["CUDA_VISIBLE_DEVICES"] = args.GPU_NO
 
-    if args.target == 'time_until_event':
-        frog = -1
-    elif args.target == 'delta_in_2_days':
-        frog = 2
-    train_path = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/targets/till_end_mimic_iv_extra_features_train_NOTE_TARGET_{frog}_{args.note_type[:3]}_{args.noteid_mode}.csv'
+    train_path = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/targets/till_end_mimic_iv_extra_features_train_NOTE_TARGET_{args.target}_{args.note_type[:3]}_{args.noteid_mode}.csv'
     print(f'read from {train_path}')
 
-    model_out_dir = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/BoXHED_Fuse/model_outputs/{args.model_name}_TARGET_{frog}_{args.note_type[:3]}_{args.noteid_mode}_out'
-    data_cache_dir = os.path.join(model_out_dir, 'data_cache')
+    MODEL_OUT_DIR = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/BoXHED_Fuse/model_outputs/{args.model_name}_TARGET_{args.target}_{args.note_type[:3]}_{args.noteid_mode}_out'
+    DATA_CACHE_DIR = os.path.join(MODEL_OUT_DIR, 'data_cache')
+
+    if ',' in args.target:
+        args.target = args.target.split(',')
+        args.target = [int(t) for t in args.target]
+        TARGET_LABEL = "delta_in_X_hours"
+    else:
+        args.target = int(args.target)
+        TARGET_LABEL = f"delta_in_{args.target}_hours" if args.target != -1 else "time_until_event"
+    print('target:', args.target)
+    print('TARGET_LABEL:', TARGET_LABEL)
 
     if args.test:
         train_path = os.path.join(os.path.dirname(train_path), 'testing', os.path.basename(train_path))
-        model_out_dir = os.path.join(os.path.dirname(model_out_dir), 'testing', os.path.basename(model_out_dir))
+        MODEL_OUT_DIR = os.path.join(os.path.dirname(MODEL_OUT_DIR), 'testing', os.path.basename(MODEL_OUT_DIR))
     
-    if not os.path.exists(model_out_dir):
-        os.makedirs(model_out_dir)
-    if not os.path.exists(data_cache_dir):
-        os.makedirs(data_cache_dir)
+    if not os.path.exists(MODEL_OUT_DIR):
+        os.makedirs(MODEL_OUT_DIR)
+    if not os.path.exists(DATA_CACHE_DIR):
+        os.makedirs(DATA_CACHE_DIR)
         
-    run_cntr = find_next_dir_index(model_out_dir)
-    model_out_dir = os.path.join(model_out_dir, str(run_cntr))
-    assert(not os.path.exists(model_out_dir))
-    os.makedirs(model_out_dir)
-    print(f'created all dirs in model_out_dir', model_out_dir)
+    RUN_CNTR = find_next_dir_index(MODEL_OUT_DIR)
+    MODEL_OUT_DIR = os.path.join(MODEL_OUT_DIR, str(RUN_CNTR))
+    assert(not os.path.exists(MODEL_OUT_DIR))
+    os.makedirs(MODEL_OUT_DIR)
+    print(f'created all dirs in model_out_dir', MODEL_OUT_DIR)
 
     from transformers import AutoTokenizer, T5Config, AutoConfig, LongformerTokenizerFast, AutoModelForSequenceClassification, AutoModel, LongformerForSequenceClassification
     from BoXHED_Fuse.models.T5EncoderForSequenceClassification import T5EncoderWithHead
     from BoXHED_Fuse.models.ClinicalLongformerForSequenceClassification import ClinicalLongformerForSequenceClassification
     tokenizer, full_model = None, None
-    if args.target == 'time_until_event':
-        num_labels = 1
-    elif args.target == 'delta_in_2_days':
-        num_labels = 2
+    if TARGET_LABEL == 'time_until_event':
+        num_labels = 1 # regression
+    elif isinstance(args.target, list):
+        num_labels = len(args.target) + 1 # multiclass classification
+    else:
+        num_labels = 2 # binary classification
 
-    if args.model_type == 'T5':
-        from transformers import AutoModelForSeq2SeqLM, AutoModel
-        
+    if args.model_type == 'T5':        
         model_dir = os.path.join('/home/ugrads/a/aa_ron_su/BoXHED_Fuse/BoXHED_Fuse/models', args.model_name)
         tokenizer = AutoTokenizer.from_pretrained(model_dir)
         # tokenizer = AutoTokenizer.from_pretrained(args.model_name)
@@ -171,7 +210,6 @@ if __name__ == '__main__':
             full_model = torch.load(args.ckpt_model_path)
             print('loaded model from ckpt model path:', args.ckpt_model_path)
         else:
-            from transformers import AutoModel
             model = AutoModelForSequenceClassification.from_pretrained(model_path, num_labels = num_labels, gradient_checkpointing = True)
             longformer = model.get_submodule('longformer')
             config_new = longformer.config
@@ -184,11 +222,11 @@ if __name__ == '__main__':
 
     print(f"reading notes and target from {train_path}")
     train = pd.read_csv(train_path, converters = {'NOTE_ID_SEQ': convert_to_list})
-    train = train.rename(columns = {args.target:'label'})
+    train = train.rename(columns = {TARGET_LABEL:'label'})
 
     if args.noteid_mode == 'all':
         print(f'noteid_mode {args.noteid_mode}: exploding NOTE_ID_SEQ')
-        train = explode_train_target(train)
+        train = explode_train_target(train, TARGET_LABEL)
 
     # if args.note_type == 'radiology':
     #     all_notes_path = '/data/datasets/mimiciv_notes/physionet.org/files/mimic-iv-note/2.2/note/radiology.csv'
@@ -208,7 +246,7 @@ if __name__ == '__main__':
 
     # define the training arguments
     training_args = TrainingArguments(
-        output_dir = f'{model_out_dir}/results',
+        output_dir = f'{MODEL_OUT_DIR}/results',
         num_train_epochs = args.num_epochs,
         evaluation_strategy = "epoch",
         save_strategy="epoch",
@@ -217,9 +255,8 @@ if __name__ == '__main__':
         warmup_steps=200,
         weight_decay=0.01,
         fp16 = True,
-        logging_dir=f'{model_out_dir}/logs',
+        logging_dir=f'{MODEL_OUT_DIR}/logs',
         dataloader_num_workers = 0,
-        run_name = f'{args.model_name}_{args.note_type[:3]}_{args.noteid_mode}_{run_cntr}',
     )
     if args.model_type == 'Longformer':
         training_args.learning_rate = 2e-5
@@ -229,18 +266,25 @@ if __name__ == '__main__':
         training_args.logging_steps = 4
         # training_args.fp16_backend="amp"    
     elif args.model_type == 'T5':
+        training_args.learning_rate = 2e-5
         training_args.per_device_train_batch_size = 2 #5 # 2
         training_args.gradient_accumulation_steps = 8 #3  # 8
         training_args.per_device_eval_batch_size= 4 #10  # 4
         training_args.logging_steps = 4
 
+    if args.sweep:
+        training_args.save_checkpoint = False
+    else:
+        training_args.save_checkpoint = True
+
     # instantiate the trainer class and check for available devices
     from BoXHED_Fuse.src.MyTrainer import MyTrainer
 
+    compute_metrics_partial = partial(compute_metrics, num_labels = num_labels)
     trainer = MyTrainer(
         model=full_model,
         args=training_args,
-        compute_metrics=compute_metrics,
+        compute_metrics=compute_metrics_partial,
         train_dataset=train_data,
         eval_dataset=val_data,
     )
@@ -248,28 +292,35 @@ if __name__ == '__main__':
         trainer._load_from_checkpoint(args.ckpt_dir)
         print('loaded trainer from trainer ckpt dir:', args.ckpt_dir)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    
+
+    PROJECT_NAME = 'BoXHED_Fuse'
+    RUN_NAME = f'{args.model_name}_TARGET_{TARGET_LABEL}_{args.note_type[:3]}_{args.noteid_mode}_{RUN_CNTR}'
+
+    # ==== SWEEP 1 ====
+    sweep_configuration = {
+        "method" : "bayes",
+        "name": f"sweep_{RUN_NAME}",
+        "metric": {"goal": "minimize", "name": "Validation Loss"},
+        "parameters": {
+            "batch_size": {"values": [64, 128, 256]},
+            "lr": {"max": 1e-4, 
+                    "min":  1e-6},
+            "scheduler": {"values" : [True, False]}
+        },
+    }
 
     if args.use_wandb:
         # wandb.login(key=os.getenv('WANDB_KEY_PERSONAL'), relogin = True)
         wandb.login(key=os.getenv('WANDB_KEY_TAMU'), relogin = True)
-        
-        resume = args.ckpt_dir != None
-        wandb.init(project='BoXHED_Fuse', name=training_args.run_name, resume=resume)
-        wandb.run.name = training_args.run_name
-        print(wandb.run.get_url())
+    if args.sweep:
+        if args.sweep_id:
+            print('Creating parallel agent on existing sweep with ID', args.sweep_id)
+            wandb.agent(sweep_id=args.sweep_id, function=sweep_func, project=PROJECT_NAME)
+        else:
+            sweep_id = wandb.sweep(sweep=sweep_configuration, project=PROJECT_NAME)
+            print('Starting new sweep with ID', sweep_id)
+            wandb.agent(sweep_id=sweep_id, function=sweep_func)
     else:
-        wandb.init(mode='offline')
-
-    trainer.train()
-    # torch.save(trainer.best_model, f'{out_dir}/besls
-    # t_model.pt')
-
-    import logging
-    logging.basicConfig(filename=f'{model_out_dir}/evaluation.log', level=logging.INFO, filemode='w')
-    evaluation_result = trainer.evaluate()
-    logging.info(evaluation_result)
-
-    best_checkpoint_path = trainer.state.best_model_checkpoint
-    logging.info(f"best_checkpoint_path: {best_checkpoint_path}")
-
-    print(f"RUN {training_args.run_name} FINISHED. Out dir: {model_out_dir}")
+        finetune(trainer)
+    

@@ -1,0 +1,64 @@
+,SUBJECT_ID,ICUSTAY_ID,t_start,t_end,Capillary refill rate,Diastolic blood pressure,Fraction inspired oxygen,Glascow coma scale total,Glucose,Heart Rate,Height,Mean blood pressure,Oxygen saturation,Respiratory rate,Systolic blood pressure,Temperature,Weight,pH,Ethnicity,Gender,Age,Height_static,Weight_static,Inspired O2 Fraction,Respiratory Rate,O2 saturation pulseoxymetry,PEEP set,Inspired Gas Temp.,Paw High,Vti High,Fspn High,Apnea Interval,Tidal Volume (set),Tidal Volume (observed),Minute Volume,Respiratory Rate (Set),Respiratory Rate (spontaneous),Respiratory Rate (Total),Peak Insp. Pressure,Plateau Pressure,Mean Airway Pressure,Total PEEP Level,Inspiratory Time,Expiratory Ratio,Inspiratory Ratio,Ventilator Tank #1,Ventilator Tank #2,Tidal Volume (spontaneous),PSV Level,O2 Flow,O2 Flow (additional cannula),Flow Rate (L/min),RCexp (Measured Time Constant),Compliance,Pminimum,Pinsp (Hamilton),Resistance Insp,Resistance Exp,CO2 production,Cuff Pressure,ETT Position Change,ETT Re-taped,Spont Vt,Spont RR,MDI #1 Puff,Cuff Volume (mL),In-line Suction Catheter Changed,Trach Care,MDI #2 Puff,MDI #3 Puff,Negative Insp. Force,Vital Cap,BiPap O2 Flow,PCV Level,BiPap EPAP,BiPap IPAP,Pinsp (Draeger only),Recruitment Duration,PeCO2,Recruitment Press,Nitric Oxide,Nitric Oxide Tank Pressure,Transpulmonary Pressure (Exp. Hold),Transpulmonary Pressure (Insp. Hold),P High (APRV),P Low (APRV),T High (APRV),T Low (APRV),Small Volume Neb Dose #2,% Minute Volume,ATC %,BiPap bpm (S/T -Back up),Peak Exp Flow Rate,Vd/Vt Ratio,Resting Energy Expenditure,Resistance,O2 Consumption,Respiratory Quotient,#past_IVs,t_from_last_IV_t_start,t_from_last_IV_t_end,delta,INTIME,t_start_DT,NOTE_ID,time_since_note,text,delta_in_1_days,delta_in_3_days,delta_in_5_days
+151,12980335.0,30001148.0,0.0,0.4,,,,,,,183.0,,,,,,65.7,,0.0,2.0,68.70812591958396,183.0,65.7,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,0.0,,,0,2156-08-30 11:10:59,2156-08-30 11:10:59.000000000,12980335-RR-16,20.21638888888889,"HISTORY:  Preoperative for CABG.
+
+FINDINGS:  No previous images.  Hyperexpansion of the lungs with flattening of
+the hemidiaphragms and increased retrosternal air space is consistent with
+chronic pulmonary disease.  However, no evidence of acute focal pneumonia,
+vascular congestion, or enlargement of the cardiomediastinal silhouette.
+",1,1,1
+152,12980335.0,30001148.0,0.4,1.217,,,,,,,,,,,,,65.544044,,0.0,2.0,68.70812591958396,183.0,65.7,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,0.0,,,0,2156-08-30 11:10:59,2156-08-30 11:34:59.000000000,12980335-RR-16,20.61638888888889,"HISTORY:  Preoperative for CABG.
+
+FINDINGS:  No previous images.  Hyperexpansion of the lungs with flattening of
+the hemidiaphragms and increased retrosternal air space is consistent with
+chronic pulmonary disease.  However, no evidence of acute focal pneumonia,
+vascular congestion, or enlargement of the cardiomediastinal silhouette.
+",1,1,1
+153,12980335.0,30001148.0,1.217,1.684,,,,,113.0,,,,,,,,,7.39,0.0,2.0,68.70812591958396,183.0,65.7,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,0.0,,,0,2156-08-30 11:10:59,2156-08-30 12:24:00.200000000,12980335-RR-16,21.43338888888889,"HISTORY:  Preoperative for CABG.
+
+FINDINGS:  No previous images.  Hyperexpansion of the lungs with flattening of
+the hemidiaphragms and increased retrosternal air space is consistent with
+chronic pulmonary disease.  However, no evidence of acute focal pneumonia,
+vascular congestion, or enlargement of the cardiomediastinal silhouette.
+",1,1,1
+154,12980335.0,30001148.0,1.684,2.284,,,,,148.0,,,,,,,,,7.49,0.0,2.0,68.70812591958396,183.0,65.7,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,0.0,,,0,2156-08-30 11:10:59,2156-08-30 12:52:01.400000000,12980335-RR-16,21.900388888888887,"HISTORY:  Preoperative for CABG.
+
+FINDINGS:  No previous images.  Hyperexpansion of the lungs with flattening of
+the hemidiaphragms and increased retrosternal air space is consistent with
+chronic pulmonary disease.  However, no evidence of acute focal pneumonia,
+vascular congestion, or enlargement of the cardiomediastinal silhouette.
+",1,1,1
+155,12980335.0,30001148.0,2.284,2.767,,,,,146.0,,,,,,,,,7.53,0.0,2.0,68.70812591958396,183.0,65.7,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,0.0,,,0,2156-08-30 11:10:59,2156-08-30 13:28:01.399999999,12980335-RR-16,22.500388888611116,"HISTORY:  Preoperative for CABG.
+
+FINDINGS:  No previous images.  Hyperexpansion of the lungs with flattening of
+the hemidiaphragms and increased retrosternal air space is consistent with
+chronic pulmonary disease.  However, no evidence of acute focal pneumonia,
+vascular congestion, or enlargement of the cardiomediastinal silhouette.
+",1,1,1
+156,12980335.0,30001148.0,2.767,2.817,,,,,149.0,,,,,,,,,7.39,0.0,2.0,68.70812591958396,183.0,65.7,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,0.0,,,0,2156-08-30 11:10:59,2156-08-30 13:57:00.200000000,12980335-RR-16,22.98338888888889,"HISTORY:  Preoperative for CABG.
+
+FINDINGS:  No previous images.  Hyperexpansion of the lungs with flattening of
+the hemidiaphragms and increased retrosternal air space is consistent with
+chronic pulmonary disease.  However, no evidence of acute focal pneumonia,
+vascular congestion, or enlargement of the cardiomediastinal silhouette.
+",1,1,1
+157,12980335.0,30001148.0,2.817,3.317,,,,,,,,,,15.0,,,,,0.0,2.0,68.70812591958396,183.0,65.7,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,0.0,,,0,2156-08-30 11:10:59,2156-08-30 14:00:00.200000000,12980335-RR-16,23.033388888888886,"HISTORY:  Preoperative for CABG.
+
+FINDINGS:  No previous images.  Hyperexpansion of the lungs with flattening of
+the hemidiaphragms and increased retrosternal air space is consistent with
+chronic pulmonary disease.  However, no evidence of acute focal pneumonia,
+vascular congestion, or enlargement of the cardiomediastinal silhouette.
+",1,1,1
+158,12980335.0,30001148.0,3.317,3.517,0.0,64.0,,3.0,,80.0,,78.0,100.0,,107.0,35.333333333333336,,,0.0,2.0,68.70812591958396,183.0,65.7,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,0.0,,,0,2156-08-30 11:10:59,2156-08-30 14:30:00.200000000,12980335-RR-16,23.533388888888886,"HISTORY:  Preoperative for CABG.
+
+FINDINGS:  No previous images.  Hyperexpansion of the lungs with flattening of
+the hemidiaphragms and increased retrosternal air space is consistent with
+chronic pulmonary disease.  However, no evidence of acute focal pneumonia,
+vascular congestion, or enlargement of the cardiomediastinal silhouette.
+",1,1,1
+159,12980335.0,30001148.0,3.517,3.567,,,,,,,,,97.0,,,,,,0.0,2.0,68.70812591958396,183.0,65.7,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,0.0,,,1,2156-08-30 11:10:59,2156-08-30 14:42:00.200000000,12980335-RR-16,23.73338888888889,"HISTORY:  Preoperative for CABG.
+
+FINDINGS:  No previous images.  Hyperexpansion of the lungs with flattening of
+the hemidiaphragms and increased retrosternal air space is consistent with
+chronic pulmonary disease.  However, no evidence of acute focal pneumonia,
+vascular congestion, or enlargement of the cardiomediastinal silhouette.
+",1,1,1

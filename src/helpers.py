@@ -50,20 +50,39 @@ def load_all_notes(note_type):
     all_notes.rename(columns={'note_id': 'NOTE_ID'}, inplace=True)
     return all_notes
 
-def explode_train_target(train_target):
+def explode_train_target(train_target, target_label):
     '''
     explode train['NOTE_ID_SEQ'] for meta-finetuning
     drop duplicate notes
+
+    args:
+        train_target: train dataframe with targets
+        target: str, time_until_event or delta_in_2_days
+
+        if a note has delta within 2 days, we put a label of 1
+        or, for regression, if a note has an event in n days, we put time_until_
     '''
-    positive_notes = train_target[train_target['label'] == 1]['NOTE_ID'].tolist()
-    train_sequences = pd.DataFrame(train_target[['ICUSTAY_ID', 'NOTE_ID', 'NOTE_ID_SEQ']].explode('NOTE_ID_SEQ').drop_duplicates(subset='NOTE_ID_SEQ'))
-    train_sequences.rename(columns={'NOTE_ID' : 'NOTE_ID_RECENT'}, inplace=True)
-    train_sequences.rename(columns={'NOTE_ID_SEQ' : 'NOTE_ID'}, inplace=True)
-    train_sequences['label'] = train_sequences['NOTE_ID'].apply(lambda x: x in positive_notes)
-    train_sequences['label'].replace({True: 1, False: 0}, inplace=True)
-    train_sequences.reset_index(inplace=True, drop=True)
-    # train_sequences.rename(columns={'index':'agg_index'}, inplace=True)
+    if target_label == 'delta_in_2_days':
+        positive_notes = train_target[train_target['label'] == 1]['NOTE_ID'].tolist()
+        train_sequences = pd.DataFrame(train_target[['ICUSTAY_ID', 'NOTE_ID', 'NOTE_ID_SEQ']].explode('NOTE_ID_SEQ').drop_duplicates(subset='NOTE_ID_SEQ'))
+        train_sequences.rename(columns={'NOTE_ID' : 'NOTE_ID_RECENT'}, inplace=True)
+        train_sequences.rename(columns={'NOTE_ID_SEQ' : 'NOTE_ID'}, inplace=True)
+        train_sequences['label'] = train_sequences['NOTE_ID'].apply(lambda x: x in positive_notes)
+        train_sequences['label'].replace({True: 1, False: 0}, inplace=True)
+        train_sequences.reset_index(inplace=True, drop=True)
+        # train_sequences.rename(columns={'index':'agg_index'}, inplace=True)
+    elif target_label == 'time_until_event':
+        train_target.rename(columns={'time_until_event':'label'}, inplace=True)
+        train_sequences = pd.DataFrame(train_target[['ICUSTAY_ID', 'NOTE_ID', 'NOTE_ID_SEQ', 'label']].explode('NOTE_ID_SEQ').drop_duplicates(subset='NOTE_ID_SEQ'))
+        train_sequences.rename(columns={'NOTE_ID' : 'NOTE_ID_RECENT'}, inplace=True)
+        train_sequences.rename(columns={'NOTE_ID_SEQ' : 'NOTE_ID'}, inplace=True)
+        breakpoint()
     return train_sequences
+
+def merge_text(data, note_type):
+    all_notes = load_all_notes(note_type)
+    data = pd.merge(data, all_notes[['NOTE_ID','text']], on='NOTE_ID', how='left')
+    return data
 
 def merge_embs_to_seq(train_target, train_embs) -> List:
     '''
@@ -126,31 +145,44 @@ def validate_train_emb_seq(train_embseq, train_target):
 
 
 
-def compute_metrics(pred) -> Dict[str, float]:
+def compute_metrics(pred, num_labels) -> Dict[str, float]:
     ''' Uses prediction label_ids and predicttions to compute precision recall, accuracy and f1. 
     '''
     labels = pred.label_ids
     preds = pred.predictions.argmax(-1)
     # argmax(pred.predictions, axis=1)
     #pred.predictions.argmax(-1)
-    precision, recall, f1, _ = precision_recall_fscore_support(labels, preds, average='binary')
+    if num_labels == 2:
+        average = "binary"
+    elif num_labels > 2:
+        average = "weighted"
+    breakpoint()
+    precision, recall, f1, _ = precision_recall_fscore_support(labels, preds, average=average)
     acc = accuracy_score(labels, preds)
 
-    try:
-        auc = roc_auc_score(labels, preds)
-    except ValueError as e:
-        print(f"Error: {e}")
-        auc = None
-
-    auprc = average_precision_score(labels, preds)
-    return {
-        'auc' : auc,
-        'auprc' : auprc,
-        'accuracy': acc,
-        'f1': f1,
-        'precision': precision,
-        'recall': recall
-    }
+    if num_labels <= 2:
+        try:
+            auc = roc_auc_score(labels, preds)
+        except ValueError as e:
+            print(f"Error: {e}")
+            auc = None
+        auprc = average_precision_score(labels, preds)
+    
+        return {
+            'auc' : auc,
+            'auprc' : auprc,
+            'accuracy': acc,
+            'f1': f1,
+            'precision': precision,
+            'recall': recall
+        }
+    else:
+        return {
+            'accuracy': acc,
+            'f1': f1,
+            'precision': precision,
+            'recall': recall
+        }
 
 def compute_metrics_LSTM(labels, preds) -> Dict[str, float]:
     ''' 
@@ -248,25 +280,40 @@ class Sequential_Dataset_FAST(data.Dataset):
         # print(f'populated emb_seq_out for getitem, took {time.time() - t0} seconds')
         return emb_seq_out.cuda(), y
 
+class PredictionObject:
+    def __init__(self, label_ids, predictions):
+        self.label_ids = label_ids
+        self.predictions = predictions
+
 if __name__ == '__main__':
-    train_target_path = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/targets/testing/till_end_mimic_iv_extra_features_train_NOTE_TARGET_2_rad_all.csv'
-    train_target = pd.read_csv(train_target_path, converters = {'NOTE_ID_SEQ': convert_to_list})
-    target = 'delta_in_2_days' 
-    train_target = train_target.rename(columns = {target:'label'})
-    train_target_exploded = explode_train_target(train_target)
+    # Example with correct and incorrect predictions
+    label_ids_example = torch.tensor([1, 3, 2, 0, 4, 5])  # Ground truth labels
+    predictions_example = torch.tensor([[0.8, 1, 0.05, 1, 0.02, 0.01],
+                                        [0.01, 0.1, 0.2, 0.5, 0.05, 0.14],
+                                        [0.01, 0.05, 0.7, 0.02, 0.1, 0.12],
+                                        [0.9, 0.05, 0.02, 0.01, 0.01, 0.01],
+                                        [0.9, 0.05, 0.02, 0.01, 0.01, 0.01],
+                                        [0.9, 0.05, 0.02, 0.01, 0.01, 0.01]])
+    pred = PredictionObject(label_ids = label_ids_example, predictions = predictions_example)
+    print(compute_metrics(pred = pred, num_labels = 6))
+    # train_target_path = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/targets/testing/till_end_mimic_iv_extra_features_train_NOTE_TARGET_2_rad_all.csv'
+    # train_target = pd.read_csv(train_target_path, converters = {'NOTE_ID_SEQ': convert_to_list})
+    # target = 'delta_in_2_days' 
+    # train_target = train_target.rename(columns = {target:'label'})
+    # train_target_exploded = explode_train_target(train_target)
 
-    train_target_exploded['emb_FAKE'] = train_target_exploded.index
+    # train_target_exploded['emb_FAKE'] = train_target_exploded.index
 
-    print(train_target.head())
-    print(train_target_exploded.head())
+    # print(train_target.head())
+    # print(train_target_exploded.head())
 
-    train_target_embseq = merge_embs_to_seq(train_target, train_embs = train_target_exploded,)
-    print(train_target_embseq.head())
-    validate_train_target_embseq(train_target_embseq.copy())
+    # train_target_embseq = merge_embs_to_seq(train_target, train_embs = train_target_exploded,)
+    # print(train_target_embseq.head())
+    # validate_train_target_embseq(train_target_embseq.copy())
     
 
-    train_embs_path = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/embs{"/testing"}/{"Clinical-T5-Base"}_{"rad"}_{"all"}_out/from_epoch1/1/train_embs.pt'
-    train_embs = torch.load(train_embs_path)
+    # train_embs_path = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION_NEW/data/embs{"/testing"}/{"Clinical-T5-Base"}_{"rad"}_{"all"}_out/from_epoch1/1/train_embs.pt'
+    # train_embs = torch.load(train_embs_path)
 
     
     
