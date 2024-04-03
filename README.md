@@ -1,44 +1,38 @@
-# BoXHED2.0
+# BoXHED Fuse
 
-**Bo**osted e**X**act **H**azard **E**stimator with **D**ynamic covariates v2.0 (BoXHED2.0, pronounced 'box-head') is a software package for nonparametrically estimating hazard functions via gradient boosted trees. BoXHED2.0 accommodates both time-static and time-dependent covariates.
+BoXHED Fuse is a clinical note embedding pipeline designed for BoXHED 2.0, a software package for nonparametrically estimating hazard functions via gradient boosted trees. BoXHED Fuse aims to improve BoXHED 2.0's training capabilities by enriching its dataset with note embeddings.
 
-Please refer to [Pakbin et al. (2023)](#suggested-citations) for details, which is a major extension of BoXHED1.0 ([Wang et al. 2020](#suggested-citations)). The theoretical underpinnings for BoXHED is provided in [Lee, Chen, Ishwaran (2021)](#suggested-citations).
+As a repository, BoXHED Fuse functions independently of BoXHED 2.0. It transforms clinical notes from MIMIC IV electronic health records (EHR) into note embeddings, which are merged with BoXHED 2.0 time-series data. The resulting augmented dataset is directly usable for BoXHED 2.0.
 
-What’s new (over BoXHED1.0):
- - Allows for survival data beyond right censoring, including recurrent events, and cause-specific hazards in competing risks settings
- - Significant speedup from data preprocessing and C++ codebase
- - Multicore CPU and GPU support
- - Integrated [TreeSHAP](https://github.com/shap/shap) support for interpretable explanations of estimated log-hazard values
+For the BoXHED 2.0 repository, click [here](https://github.com/BoXHED/BoXHED2.0).
+
+For the BoXHED 2.0 paper, please refer to [Pakbin et al. (2023)](#suggested-citations) for details.
+
+
 
 ## Suggested citations
+- TODO add BoXHED Fuse paper
+
 - Pakbin, Wang, Mortazavi, Lee (2023): [BoXHED2.0: Scalable boosting of dynamic survival analysis](https://arxiv.org/abs/2103.12591)
 
-- Lee, Chen, Ishwaran (2021): [Boosted nonparametric hazards with time-dependent covariates](https://projecteuclid.org/journals/annals-of-statistics/volume-49/issue-4/Boosted-nonparametric-hazards-with-time-dependent-covariates/10.1214/20-AOS2028.full) (*Annals of Statistics*  49:4:2101-2128)
-
-- Wang, Pakbin, Mortazavi, Zhao, Lee (2020): [BoXHED: Boosted eXact
-Hazard Estimator with Dynamic covariates](https://proceedings.mlr.press/v119/wang20o.html) (*International Conference on Machine
-Learning (ICML)* 9973–9982)
-
 ## Prerequisites
-The software was developed and tested in Linux, Mac OS, and Windows10 environments. The requirements are the following:
-- Python (=3.8)
+- Python (=3.10)
 - conda  (we recommend using the free [Anaconda distribution](https://docs.anaconda.com/anaconda/install/))
 
 
-## Setting up BoXHED2.0
-1. **[Windows users only]** Install Visual Studio 17 2022 toolset. During installation, under the "Workloads" tab select "Desktop Development with C++" in the "Desktop and Mobile" section. Make the following selections in the menu on the right: ![sc__](https://user-images.githubusercontent.com/34462617/201495851-c7d02796-31e0-4181-9eba-78065d2a5f59.png)
+## Setting up BoXHED Fuse
 
-2. Set up a dedicated virtual environment for BoXHED2.0. This ensures that BoXHED2.0 will not interfere with any existing XGBoost packages. This implementation uses python 3.8. In this example we use [Anaconda Prompt](https://docs.anaconda.com/anaconda/install/) to open a terminal. First, create a virtual environment called boxhed2:
+2. Set up a dedicated virtual environment for BoXHED Fuse. First, create a virtual environment called BoXHED_Fuse:
 ```
-conda create -n boxhed2 python=3.8
+conda create -n BoXHED_Fuse python=3.10
 ```
 
 then activate it
 ```
-conda activate boxhed2
+conda activate BoXHED_Fuse
 ```
 
-3. Install the version dependencies by pasting the following lines into your terminal:
+<!-- 3. Install the version dependencies by pasting the following lines into your terminal:
 ```
 pip install matplotlib==3.7.1
 pip install pillow==9.4.0
@@ -103,4 +97,4 @@ cd BoXHED2.0
 ```
 jupyter notebook BoXHED2_tutorial.ipynb
 ```
-For Mac users, Apple's security system may complain about the precompiled components of BoXHED2.0. In that case, the instructions on [this page](https://www.easeus.com/computer-instruction/apple-cannot-check-it-for-malicious-software.html) will be helpful.
+For Mac users, Apple's security system may complain about the precompiled components of BoXHED2.0. In that case, the instructions on [this page](https://www.easeus.com/computer-instruction/apple-cannot-check-it-for-malicious-software.html) will be helpful. -->
