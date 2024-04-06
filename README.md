@@ -19,10 +19,25 @@ For the BoXHED 2.0 paper, please refer to [Pakbin et al. (2023)](#suggested-cita
 - Python (=3.10)
 - conda  (we recommend using the free [Anaconda distribution](https://docs.anaconda.com/anaconda/install/))
 
+## How to use BoXHED Fuse -- Overview
+1. Obtain data -- Use MIMIC-IV-Extract (TODO LINKME). This is the data we will augment with note embeddings
+2. Get embeddings -- BoXHED Fuse will take care of this. The [tutorial](#tutorial) below explains this in detail.
+3. Feed into [BoXHED 2.0](https://github.com/BoXHED/BoXHED2.0) -- Use BoXHED Fuse outputs to train and test on BoXHED 2.0
+
+
+
+# TUTORIAL
+
+## Obtaining Data
+TODO describe permissions for MIMIC IV
+
+## Preprocess Data
+TODO link to and explain MIMIC IV EXTRACT
+
 
 ## Setting up BoXHED Fuse
 
-2. Set up a dedicated virtual environment for BoXHED Fuse. First, create a virtual environment called BoXHED_Fuse:
+Set up a dedicated virtual environment for BoXHED Fuse. First, create a virtual environment called BoXHED_Fuse:
 ```
 conda create -n BoXHED_Fuse python=3.10
 ```
@@ -32,9 +47,54 @@ then activate it
 conda activate BoXHED_Fuse
 ```
 
-install
+To setup environment, navigate to root "BoXHED_Fuse" directory. Install packages and run setup.py.
+
 ```
+# Your directory should look something like
+# .
+# ├── BoXHED_Fuse
+# ├── environment.yml
+# ├── README.md
+# ├── requirements.txt
+# └── setup.py
+
+> python setup.py install 
+# This allows module imports
+
+> pip install -e .
+# Any modifications to the BoXHED_Fuse package will automatically be reflected in the build.
 ```
+## Running BoXHED Fuse
+
+To add modularity, each python script can be run on its own, by bash script, or within notes_pipeline.py.
+I recommend writing an individual bash script for each python script, and then combining them in notes_pipeline.py. 
+### OPTION 1: python script
+Python scripts are stored in BoXHED_Fuse/src. Navigate there.
+
+```
+# to get usage details:
+    > python <script_name>.py --h 
+
+# use those arguments to run the file from the terminal. For example,
+
+    > python add_notes.py --test --use-wandb --note-type radiology --noteid-mode recent
+```
+
+### OPTION 1: bash script
+
+Bash scripts are stored in BoXHED_Fuse/scripts. Navigate there.
+
+A default bash script is supplied for each python script. 
+
+```
+bash <script_name>.sh
+```
+
+
+Keep in mind that bash scripts named exactly the same as the python script will be used in the notes pipeline. Ex: my_script.py should be named my_script.sh
+
+
+
 
 
 
