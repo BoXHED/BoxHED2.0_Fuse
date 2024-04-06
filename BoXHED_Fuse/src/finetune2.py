@@ -16,7 +16,7 @@ import argparse
 from functools import partial
 import traceback
 
-from BoXHED_Fuse.src.log_artifact import log_artifact
+from BoXHED_Fuse.experiments.log_artifact import log_artifact
 from BoXHED_Fuse.src.helpers import find_next_dir_index, merge_embs_to_seq, convert_to_list, convert_to_nested_list, compute_metrics_LSTM, Sequential_Dataset, Sequential_Dataset_FAST, group_train_val, explode_train_target, validate_train_emb_seq
 from BoXHED_Fuse.src.MyTrainer import MyTrainer 
 from BoXHED_Fuse.models.ClinicalLSTM import ClinicalLSTM

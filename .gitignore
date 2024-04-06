@@ -1,43 +1,36 @@
 # IGNORE DATA
 BoXHED_Fuse/JSS_SUBMISSION_NEW/
 
+# IGNORE CACHES
 *.pyc
 __pycache__/*
-data_cache/*
-*/data_cache/*
+data_cache
 BoXHED_Fuse/logs/
 BoXHED_Fuse/logs_test/
 wandb
+BoXHED_Fuse/tmp/
+BoXHED_Fuse/tmpcache/
+
+# IGNORE CREDENTIALED MODELS
+BoXHED_Fuse/models/Clinical-T5-Base
+BoXHED_Fuse/models/Clinical-T5-Large
+BoXHED_Fuse/models/Clinical-T5-Sci
+BoXHED_Fuse/models/Clinical-T5-Scratch
+
+# IGNORE MODEL CHECKPOINTS
+BoXHED_Fuse/model_outputs/
+
+
+# IGNORE SCRIPTS
+BoXHED_Fuse/scripts/
+
+# IGNORE DEV SCRIPTS/ DATA
 old_data/*
 views
 viewer*.ipynb
 
-BoXHED_Fuse/scripts/
-BoXHED_Fuse/model_outputs/
-BoXHED_Fuse/clinicalXLNet/
-BoXHED_Fuse/Clinical-Longformer_out/
-BoXHED_Fuse/Clinical-Longformer_rad_out/
-BoXHED_Fuse/Clinical-Longformer_rad_test_out/
-BoXHED_Fuse/Clinical-Longformer_test_out/
-BoXHED_Fuse/Clinical-Longformer_dis_test_out/
-BoXHED_Fuse/Clinical-T5-Base_out/
-BoXHED_Fuse/Clinical-T5-Base_rad_out/
-BoXHED_Fuse/Clinical-T5-Base_test_out/
-BoXHED_Fuse/frozen_encoder_model_out/
-BoXHED_Fuse/longformer/
-BoXHED_Fuse/tokenized_notes/
-BoXHED_Fuse/tmp/
-BoXHED_Fuse/tmpcache/
-BoXHED_Fuse/tokenized_notes_rad/
-BoXHED_Fuse/model_test_rad/
-BoXHED_Fuse/model_test/
-BoXHED_Fuse/model_from_ckpt*/
-BoXHED_Fuse/model/
-
-BoXHED_Fuse/Clinical-T5-Base/  
-BoXHED_Fuse/Clinical-T5-Large/  
-BoXHED_Fuse/Clinical-T5-Sci/  
-BoXHED_Fuse/Clinical-T5-Scratch/
+# IGNORE EXTRANEOUS PACKAGES
+extraneous/
 
 BoXHED_Fuse.egg-info
 settings.json

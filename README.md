@@ -32,6 +32,12 @@ then activate it
 conda activate BoXHED_Fuse
 ```
 
+install
+```
+```
+
+
+
 <!-- 3. Install the version dependencies by pasting the following lines into your terminal:
 ```
 pip install matplotlib==3.7.1

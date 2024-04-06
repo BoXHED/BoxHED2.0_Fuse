@@ -31,7 +31,7 @@ def generate_dataloader(emb_seq, batch_size):
     # tdataset = Sequential_Dataset()
 
     
-    # input_ids = torch.tensor(tokenized_notes.input_ids, dtype=torch.long)
+    # input_ids = torch.tensor(.input_ids, dtype=torch.long)
     # attention_mask = torch.tensor(tokenized_notes.attention_mask, dtype=torch.long)
 
     # tdataset = TensorDataset(input_ids.to(device),

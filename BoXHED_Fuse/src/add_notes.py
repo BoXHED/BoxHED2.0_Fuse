@@ -3,7 +3,7 @@ import argparse
 from time import time
 import os
 import wandb
-from log_artifact import log_artifact
+from BoXHED_Fuse.experiments.log_artifact import log_artifact
 from functools import partial
 from tqdm.auto import tqdm
 tqdm.pandas()
