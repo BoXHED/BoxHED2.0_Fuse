@@ -80,7 +80,7 @@ if __name__ == '__main__':
     SWEEP = False
     SWEEP_ID = -1
     MODEL_NAME = 'Clinical-T5-Base'
-    MODEL_DIR = os.path.join('/home/ugrads/a/aa_ron_su/BoXHED_Fuse/BoXHED_Fuse/models', MODEL_NAME)
+    MODEL_DIR = os.path.join('os.getenv('BHF_ROOT')/models', MODEL_NAME)
     TRAIN_PATH = f'{os.getenv("BHF_ROOT")}/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_train_NOTE_rad_recent.csv'
     TEST_PATH = f'{os.getenv("BHF_ROOT")}/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_test_NOTE_rad_recent.csv'
     DEVICE = torch.device(f'cuda' if torch.cuda.is_available() else 'cpu')

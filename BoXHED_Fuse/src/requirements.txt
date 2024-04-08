@@ -1,8 +1,0 @@
-BoXHED_Fuse.egg==info
-datasets==2.10.1
-numpy==1.24.3
-pandas==1.5.3
-scikit_learn==1.2.0
-torch==1.12.1
-tqdm==4.65.0
-transformers==4.24.0

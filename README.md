@@ -37,14 +37,15 @@ TODO link to and explain MIMIC IV EXTRACT
 
 ## Setting up BoXHED Fuse
 
+### Environment 
 Set up a dedicated virtual environment for BoXHED Fuse. First, create a virtual environment called BoXHED_Fuse:
 ```
-conda create -n BoXHED_Fuse python=3.10
+$ conda create -n BoXHED_Fuse python=3.10
 ```
 
 then activate it
 ```
-conda activate BoXHED_Fuse
+$ conda activate BoXHED_Fuse
 ```
 
 To setup environment, navigate to root "BoXHED_Fuse" directory. Install packages and run setup.py.
@@ -58,11 +59,48 @@ To setup environment, navigate to root "BoXHED_Fuse" directory. Install packages
 # ├── requirements.txt
 # └── setup.py
 
-> python setup.py install 
+$ python setup.py install 
 # This allows module imports
 
-> pip install -e .
+$ pip install -e .
 # Any modifications to the BoXHED_Fuse package will automatically be reflected in the build.
+```
+
+### Define environmental varaibles
+
+Some scripts contain a --use-wandb argument. If you wish to use wandb to track finetuning progress and store data artifacts, you must obtain a wandb key.
+
+To get your login key, you can head to wandb.ai to create an account. Then go to your settings (https://wandb.ai/settings). In the settings page, you will find your API keys area where you can create a new one or copy an existing one. You will use this key for logging in.
+
+The WANDB_PROJECT_NAME is a name of your choice, which will create a wandb project. Create a unique project name. For example "BoXHED_Fuse".
+
+BHF_ROOT is used to define paths. You can find it by navigating to BoXHED_Fuse/BoXHED_Fuse and entering the command 
+```
+$ pwd
+```
+
+NOTE_DIR is the directroy where your MIMIC IV notes from physionet.org are stored. This may look like some variation of "<your_note_dir>/physionet.org/files/mimic-iv-note/2.2/note/"
+
+In your .bashrc, add the specified environmental variables, shown below. This will automatically be set every time you create a new bash terminal or start a bash script.
+```
+# add these lines anywhere in your .bashrc
+export WANDB_KEY="<your_key>"
+export WANDB_PROJECT_NAME="<your_project_name>" 
+export BHF_ROOT="<your_root_path>/BoXHED_Fuse/BoXHED_Fuse/"
+export NOTE_DIR="<your_note_dir>/
+
+# This only needs to be done once to ensure the environmental variable is set.
+    $ source ~/.bashrc
+
+# Verify that the variables are set
+    $ echo $WANDB_KEY
+    <your_key>
+    $ echo $WANDB_PROJECT_NAME
+    <your_project_name>
+    $ echo $BHF_ROOT
+    <your_root_path>/BoXHED_Fuse/BoXHED_Fuse/>   
+    $ echo $NOTE_DIR
+    <your_note_dir>/physionet.org/files/mimic-iv-note/2.2/note/ 
 ```
 ## Running BoXHED Fuse
 
@@ -80,18 +118,29 @@ Python scripts are stored in BoXHED_Fuse/src. Navigate there.
     > python add_notes.py --test --use-wandb --note-type radiology --noteid-mode recent
 ```
 
-### OPTION 1: bash script
+### OPTION 2: bash script
 
 Bash scripts are stored in BoXHED_Fuse/scripts. Navigate there.
 
 A default bash script is supplied for each python script. 
 
+To change arguments, I recommend creating a new bash script. For example you could modify add_notes.sh as add_notes_1.sh, add_notes_2.sh, etc. 
 ```
-bash <script_name>.sh
+    > bash <script_name>.sh
+    
 ```
 
 
-Keep in mind that bash scripts named exactly the same as the python script will be used in the notes pipeline. Ex: my_script.py should be named my_script.sh
+### OPTION 3: notes pipeline
+
+This streamlines bash scripts into a single pipeline. Simply supply the bash scripts you intend to use. 
+
+```
+TODO add here
+```
+
+
+
 
 
 
