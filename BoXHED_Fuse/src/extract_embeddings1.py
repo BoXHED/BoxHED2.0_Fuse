@@ -1,3 +1,4 @@
+import numpy as np
 import os
 import torch
 import argparse
@@ -5,10 +6,9 @@ import pandas as pd
 import re
 from torch.utils.data import DataLoader, TensorDataset
 from time import time
-import numpy as np
 import torch
 from datasets import Dataset
-from BoXHED_Fuse.src.helpers import tokenization, load_all_notes, find_next_dir_index, explode_train_target, convert_to_list, merge_text
+from BoXHED_Fuse.src.helpers import tokenization, find_next_dir_index, explode_train_target, convert_to_list, merge_text
 from functools import partial
 from transformers import LongformerTokenizerFast, AutoTokenizer
 
@@ -97,15 +97,30 @@ if __name__ == '__main__':
     If noteid_mode is "recent", populate train and test with embeddings.
     '''
     parser = argparse.ArgumentParser()
-    parser.add_argument('--test', action='store_true', help='enable args.test mode')
-    parser.add_argument('--gpu-no', dest = 'GPU_NO', help='use GPU_NO specified')
-    parser.add_argument('--ckpt-dir', dest = 'ckpt_dir', help='FULL PATH of directory where model checkpoint is stored')
-    parser.add_argument('--ckpt-model-name', dest = 'ckpt_model_name', help='directory where model checkpoint is stored')
-    parser.add_argument('--note-type', dest = 'note_type', help='which notes, radiology or discharge?')
-    parser.add_argument('--model-name', dest = 'model_name')
-    parser.add_argument('--model-type', dest = 'model_type', help = 'T5 or Longformer')
-    parser.add_argument('--noteid-mode', dest = 'noteid_mode', help = 'kw: all or recent')
-    parser.add_argument('--target', dest = 'target', help = 'what target are we using? regression "time_until_event", or categorical "delta_in_2_days, or "delta_in_1,3,10,30,100_hours"')
+    parser.add_argument('--test', action='store_true', 
+        help='enable args.test mode')
+    parser.add_argument('--gpu-no', 
+        dest = 'GPU_NO', 
+        help='use GPU_NO specified')
+    parser.add_argument('--ckpt-dir', 
+        dest = 'ckpt_dir', 
+        help='FULL PATH of directory where model checkpoint is stored')
+    parser.add_argument('--ckpt-model-name', 
+        dest = 'ckpt_model_name', 
+        help='name of model checkpoint is stored')
+    parser.add_argument('--note-type', 
+        dest = 'note_type', 
+        help='which notes, radiology or discharge?')
+    parser.add_argument('--model-name', 
+        dest = 'model_name')
+    parser.add_argument('--model-type', 
+        dest = 'model_type', help = 'T5 or Longformer')
+    parser.add_argument('--noteid-mode',                
+                        dest = 'noteid_mode', 
+                        help = 'kw: all or recent')
+    parser.add_argument('--target',                 
+                        dest = 'target', 
+                        help = 'what target are we using? binary, multiclass classification, or regression? Ex: "2", "1,3,10,30,100", "-1"')
     args = parser.parse_args()
 
     assert(args.note_type == 'radiology' or args.note_type == 'discharge')
@@ -118,7 +133,6 @@ if __name__ == '__main__':
     device = torch.device(f'cuda' if torch.cuda.is_available() else 'cpu')
     print(f"device: {device}")
 
-    # finetuned_model_path = root + '/model_from_ckpt1/meta_ft_classify.pt' # modify this line!
     train_NOTE_TARGET_path = f'{os.getenv("BHF_ROOT")}/JSS_SUBMISSION_NEW/data/targets/till_end_mimic_iv_extra_features_train_NOTE_TARGET_{args.target}_{args.note_type[:3]}_{args.noteid_mode}.csv'
     test_NOTE_TARGET_path = f'{os.getenv("BHF_ROOT")}/JSS_SUBMISSION_NEW/data/targets/till_end_mimic_iv_extra_features_test_NOTE_TARGET_{args.target}_{args.note_type[:3]}_{args.noteid_mode}.csv'
     train_NOTE_path = f'{os.getenv("BHF_ROOT")}/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_train_NOTE_{args.note_type[:3]}_{args.noteid_mode}.csv'
@@ -171,22 +185,21 @@ if __name__ == '__main__':
         tokenizer = LongformerTokenizerFast.from_pretrained(model_path)
     assert(tokenizer != None)
 
-
     to_rename = args.target
     if ',' in args.target:
         to_rename = "delta_in_X_hours"
-    elif args.target == 2:
-        to_rename = "delta_in_2_days"
-    elif args.target == -1:
+    elif re.match(r'^\d+$', args.target):
+        to_rename = f"delta_in_{args.target}_hours"
+    elif args.target == '-1':
         to_rename = "time_until_event"
     else:
-        raise ValueError()
+        raise ValueError('invalid value for args.target')
+
     train_target_exploded = pd.read_csv(train_NOTE_TARGET_path, 
                                converters = {'NOTE_ID_SEQ': convert_to_list}).rename(columns = {to_rename:'label'})
                                                             
     test_target_exploded = pd.read_csv(test_NOTE_TARGET_path, 
                               converters = {'NOTE_ID_SEQ': convert_to_list}).rename(columns = {to_rename:'label'})
-    
     
     if args.noteid_mode == 'all':
         train_target_exploded = explode_train_target(train_target_exploded)

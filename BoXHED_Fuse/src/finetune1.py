@@ -155,7 +155,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--target",
         dest="target",
-        help='what target are we using? regression "time_until_event", or categorical "delta_in_2_days, or "delta_in_1,3,10,30,100_hours"',
+        help='what target are we using? binary, multiclass classification, or regression? Ex: "2", "1,3,10,30,100", "-1"',
     )
     parser.add_argument(
         "--sweep",
@@ -219,10 +219,8 @@ if __name__ == "__main__":
             os.path.dirname(MODEL_OUT_DIR), "testing", os.path.basename(MODEL_OUT_DIR)
         )
 
-    if not os.path.exists(MODEL_OUT_DIR):
-        os.makedirs(MODEL_OUT_DIR)
-    if not os.path.exists(DATA_CACHE_DIR):
-        os.makedirs(DATA_CACHE_DIR)
+    os.makedirs(MODEL_OUT_DIR, exist_ok=True)
+    os.makedirs(DATA_CACHE_DIR, exist_ok=True)
 
     RUN_CNTR = find_next_dir_index(MODEL_OUT_DIR)
     MODEL_OUT_DIR = os.path.join(MODEL_OUT_DIR, str(RUN_CNTR))

@@ -124,7 +124,7 @@ Bash scripts are stored in BoXHED_Fuse/scripts. Navigate there.
 
 A default bash script is supplied for each python script. 
 
-To change arguments, I recommend creating a new bash script. For example you could modify add_notes.sh as add_notes_1.sh, add_notes_2.sh, etc. 
+To change arguments, I recommend creating a new bash script. For example you could create add_notes_1.sh, add_notes_2.sh, etc. 
 ```
     > bash <script_name>.sh
     
@@ -136,8 +136,22 @@ To change arguments, I recommend creating a new bash script. For example you cou
 This streamlines bash scripts into a single pipeline. Simply supply the bash scripts you intend to use. 
 
 ```
-TODO add here
+# How to use notes pipeline:
+$ python notes_pipeline.py --h
+usage: notes_pipeline.py [-h] [--bash-files BASH_FILES [BASH_FILES ...]]
+                         [--run-scripts RUN_SCRIPTS [RUN_SCRIPTS ...]]
+
+Process bash file names and run scripts.
+
+options:
+  -h, --help            show this help message and exit
+  --bash-files BASH_FILES [BASH_FILES ...]
+                        List of bash file names
+  --run-scripts RUN_SCRIPTS [RUN_SCRIPTS ...]
+                        List of boolean values indicating whether to run
+                        each script
 ```
+
 
 
 

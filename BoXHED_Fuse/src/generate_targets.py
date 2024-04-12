@@ -142,15 +142,15 @@ if args.test:
         os.path.dirname(OUTPATH_FT_TEST), "testing", os.path.basename(OUTPATH_FT_TEST)
     )
 
+os.makedirs(os.path.dirname(OUTPATH_FT_TRAIN), exist_ok=True)
+os.makedirs(os.path.dirname(OUTPATH_FT_TEST), exist_ok=True)
+
 if args.noteid_mode == "all":
     train = pd.read_csv(TRAIN_PATH, converters={"NOTE_ID_SEQ": convert_to_list})
     test = pd.read_csv(TEST_PATH, converters={"NOTE_ID_SEQ": convert_to_list})
 elif args.noteid_mode == "recent":
     train = pd.read_csv(TRAIN_PATH)
     test = pd.read_csv(TEST_PATH)
-
-# assert(not os.path.exists(outpath_ft_train))
-# assert(not os.path.exists(outpath_ft_test))
 
 for df in [train, test]:
     df["t_start_DT"] = pd.to_datetime(df["t_start_DT"])
@@ -216,10 +216,6 @@ test_note_target = test_note_target.drop_duplicates(subset="NOTE_ID").dropna()
 if isinstance(args.target, list):
     train_note_target = convert_to_category(train_note_target, args.target)
     test_note_target = convert_to_category(test_note_target, args.target)
-
-# if args.noteid_mode == 'all':
-#     train_note_target = train_note_target[train_note_target.NOTE_ID.apply(len) > 0]
-#     test_note_target = test_note_target[test_note_target.NOTE_ID.apply(len) > 0]
 
 train_note_target.to_csv(OUTPATH_FT_TRAIN, index=False)
 test_note_target.to_csv(OUTPATH_FT_TEST, index=False)

@@ -227,6 +227,8 @@ if args.test:
     out_testpath = os.path.join(
         os.path.dirname(out_testpath), "testing", os.path.basename(out_testpath)
     )
+    os.makedirs(os.path.dirname(out_trainpath), exist_ok=True)
+    os.makedirs(os.path.dirname(out_testpath), exist_ok=True)
 
 all_stays = pd.read_csv(f"{os.getenv('BHF_ROOT')}/JSS_SUBMISSION_NEW/tmp/all_stays.csv")
 
