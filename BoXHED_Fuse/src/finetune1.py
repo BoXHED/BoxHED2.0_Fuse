@@ -193,7 +193,7 @@ if __name__ == "__main__":
 
     os.environ["CUDA_VISIBLE_DEVICES"] = args.GPU_NO
 
-    train_path = f"{os.getenv('BHF_ROOT')}/JSS_SUBMISSION_NEW/data/targets/till_end_mimic_iv_extra_features_train_NOTE_TARGET_{args.target}_{args.note_type[:3]}_{args.noteid_mode}.csv"
+    train_path = f"{os.getenv('BHF_ROOT')}/JSS_SUBMISSION/data/targets/till_end_mimic_iv_extra_features_train_NOTE_TARGET_{args.target}_{args.note_type[:3]}_{args.noteid_mode}.csv"
     print(f"read from {train_path}")
 
     MODEL_OUT_DIR = f"{os.getenv('BHF_ROOT')}/model_outputs/{args.model_name}_TARGET_{args.target}_{args.note_type[:3]}_{args.noteid_mode}_out"

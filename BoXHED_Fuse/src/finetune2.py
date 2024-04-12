@@ -285,7 +285,7 @@ if __name__ == "__main__":
     if args.sweep:
         args.use_wandb = True
 
-    train_target_path = f'{os.getenv("BHF_ROOT")}/JSS_SUBMISSION_NEW/data/targets/till_end_mimic_iv_extra_features_train_NOTE_TARGET_2_{args.note_type[:3]}_{args.noteid_mode}.csv'
+    train_target_path = f'{os.getenv("BHF_ROOT")}/JSS_SUBMISSION/data/targets/till_end_mimic_iv_extra_features_train_NOTE_TARGET_2_{args.note_type[:3]}_{args.noteid_mode}.csv'
     MODEL_NAME = "Clinical-LSTM"
     model_out_dir = f'{os.getenv("BHF_ROOT")}/model_outputs/{MODEL_NAME}_{args.note_type[:3]}_{args.noteid_mode}_out'
 

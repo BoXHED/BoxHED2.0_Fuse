@@ -2,8 +2,8 @@
 # import torch
 # import os
 
-# temivef_train_NOTE_TARGET1_FT_path = '/home/ugrads/a/aa_ron_su/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_train_NOTE_TARGET1_FT_rad.csv'
-# temivef_test_NOTE_TARGET1_FT_path = '/home/ugrads/a/aa_ron_su/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_test_NOTE_TARGET1_FT_rad.csv'
+# temivef_train_NOTE_TARGET1_FT_path = '/home/ugrads/a/aa_ron_su/JSS_SUBMISSION/data/till_end_mimic_iv_extra_features_train_NOTE_TARGET1_FT_rad.csv'
+# temivef_test_NOTE_TARGET1_FT_path = '/home/ugrads/a/aa_ron_su/JSS_SUBMISSION/data/till_end_mimic_iv_extra_features_test_NOTE_TARGET1_FT_rad.csv'
 
 # from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 # model_name = "Clinical-T5-Base"

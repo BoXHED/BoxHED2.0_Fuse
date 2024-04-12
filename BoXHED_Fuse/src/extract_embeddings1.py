@@ -133,14 +133,14 @@ if __name__ == '__main__':
     device = torch.device(f'cuda' if torch.cuda.is_available() else 'cpu')
     print(f"device: {device}")
 
-    train_NOTE_TARGET_path = f'{os.getenv("BHF_ROOT")}/JSS_SUBMISSION_NEW/data/targets/till_end_mimic_iv_extra_features_train_NOTE_TARGET_{args.target}_{args.note_type[:3]}_{args.noteid_mode}.csv'
-    test_NOTE_TARGET_path = f'{os.getenv("BHF_ROOT")}/JSS_SUBMISSION_NEW/data/targets/till_end_mimic_iv_extra_features_test_NOTE_TARGET_{args.target}_{args.note_type[:3]}_{args.noteid_mode}.csv'
-    train_NOTE_path = f'{os.getenv("BHF_ROOT")}/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_train_NOTE_{args.note_type[:3]}_{args.noteid_mode}.csv'
-    test_NOTE_path = f'{os.getenv("BHF_ROOT")}/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_test_NOTE_{args.note_type[:3]}_{args.noteid_mode}.csv'
+    train_NOTE_TARGET_path = f'{os.getenv("BHF_ROOT")}/JSS_SUBMISSION/data/targets/till_end_mimic_iv_extra_features_train_NOTE_TARGET_{args.target}_{args.note_type[:3]}_{args.noteid_mode}.csv'
+    test_NOTE_TARGET_path = f'{os.getenv("BHF_ROOT")}/JSS_SUBMISSION/data/targets/till_end_mimic_iv_extra_features_test_NOTE_TARGET_{args.target}_{args.note_type[:3]}_{args.noteid_mode}.csv'
+    train_NOTE_path = f'{os.getenv("BHF_ROOT")}/JSS_SUBMISSION/data/till_end_mimic_iv_extra_features_train_NOTE_{args.note_type[:3]}_{args.noteid_mode}.csv'
+    test_NOTE_path = f'{os.getenv("BHF_ROOT")}/JSS_SUBMISSION/data/till_end_mimic_iv_extra_features_test_NOTE_{args.note_type[:3]}_{args.noteid_mode}.csv'
     epoch = re.findall(r'\d+', args.ckpt_model_name)[-1]
     outfolder = f"{args.model_name}_{args.note_type[:3]}_{args.noteid_mode}_out/from_epoch{epoch}"
-    out_dir = f'{os.getenv("BHF_ROOT")}/JSS_SUBMISSION_NEW/data/final{"/testing" if args.test else ""}/{outfolder}'
-    out_embs_dir = f'{os.getenv("BHF_ROOT")}/JSS_SUBMISSION_NEW/data/embs{"/testing" if args.test else ""}/{outfolder}'
+    out_dir = f'{os.getenv("BHF_ROOT")}/JSS_SUBMISSION/data/final{"/testing" if args.test else ""}/{outfolder}'
+    out_embs_dir = f'{os.getenv("BHF_ROOT")}/JSS_SUBMISSION/data/embs{"/testing" if args.test else ""}/{outfolder}'
 
     if not os.path.exists(out_dir) and args.noteid_mode == 'recent':
         os.makedirs(out_dir)

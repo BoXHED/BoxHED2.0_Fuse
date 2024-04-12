@@ -112,10 +112,10 @@ args = parser.parse_args()
 assert args.note_type in ["radiology", "discharge"]
 assert args.noteid_mode == "all" or args.noteid_mode == "recent"
 
-TRAIN_PATH = f"{os.getenv('BHF_ROOT')}/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_train_NOTE_{args.note_type[:3]}_{args.noteid_mode}.csv"
-TEST_PATH = f"{os.getenv('BHF_ROOT')}/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_test_NOTE_{args.note_type[:3]}_{args.noteid_mode}.csv"
-OUTPATH_FT_TRAIN = f"{os.getenv('BHF_ROOT')}/JSS_SUBMISSION_NEW/data/targets/till_end_mimic_iv_extra_features_train_NOTE_TARGET_{args.target}_{args.note_type[:3]}_{args.noteid_mode}.csv"
-OUTPATH_FT_TEST = f"{os.getenv('BHF_ROOT')}/JSS_SUBMISSION_NEW/data/targets/till_end_mimic_iv_extra_features_test_NOTE_TARGET_{args.target}_{args.note_type[:3]}_{args.noteid_mode}.csv"
+TRAIN_PATH = f"{os.getenv('BHF_ROOT')}/JSS_SUBMISSION/data/till_end_mimic_iv_extra_features_train_NOTE_{args.note_type[:3]}_{args.noteid_mode}.csv"
+TEST_PATH = f"{os.getenv('BHF_ROOT')}/JSS_SUBMISSION/data/till_end_mimic_iv_extra_features_test_NOTE_{args.note_type[:3]}_{args.noteid_mode}.csv"
+OUTPATH_FT_TRAIN = f"{os.getenv('BHF_ROOT')}/JSS_SUBMISSION/data/targets/till_end_mimic_iv_extra_features_train_NOTE_TARGET_{args.target}_{args.note_type[:3]}_{args.noteid_mode}.csv"
+OUTPATH_FT_TEST = f"{os.getenv('BHF_ROOT')}/JSS_SUBMISSION/data/targets/till_end_mimic_iv_extra_features_test_NOTE_TARGET_{args.target}_{args.note_type[:3]}_{args.noteid_mode}.csv"
 
 if "," in args.target:
     args.target = args.target.split(",")

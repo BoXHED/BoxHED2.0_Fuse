@@ -189,11 +189,11 @@ args = parser.parse_args()
 assert args.note_type == "radiology" or args.note_type == "discharge"
 assert args.noteid_mode == "all" or args.noteid_mode == "recent"
 
-trainpath = f"{os.getenv('BHF_ROOT')}/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_train.csv"  # mimic_iv_train.csv'
-testpath = f"{os.getenv('BHF_ROOT')}/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_test.csv"  # mimic_iv_test.csv'
+trainpath = f"{os.getenv('BHF_ROOT')}/JSS_SUBMISSION/data/till_end_mimic_iv_extra_features_train.csv"  # mimic_iv_train.csv'
+testpath = f"{os.getenv('BHF_ROOT')}/JSS_SUBMISSION/data/till_end_mimic_iv_extra_features_test.csv"  # mimic_iv_test.csv'
 
-out_trainpath = f"{os.getenv('BHF_ROOT')}/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_train_NOTE_{args.note_type[:3]}_{args.noteid_mode}.csv"
-out_testpath = f"{os.getenv('BHF_ROOT')}/JSS_SUBMISSION_NEW/data/till_end_mimic_iv_extra_features_test_NOTE_{args.note_type[:3]}_{args.noteid_mode}.csv"
+out_trainpath = f"{os.getenv('BHF_ROOT')}/JSS_SUBMISSION/data/till_end_mimic_iv_extra_features_train_NOTE_{args.note_type[:3]}_{args.noteid_mode}.csv"
+out_testpath = f"{os.getenv('BHF_ROOT')}/JSS_SUBMISSION/data/till_end_mimic_iv_extra_features_test_NOTE_{args.note_type[:3]}_{args.noteid_mode}.csv"
 assert os.path.exists(os.path.dirname(out_trainpath))
 assert os.path.exists(os.path.dirname(out_testpath))
 
@@ -230,7 +230,7 @@ if args.test:
     os.makedirs(os.path.dirname(out_trainpath), exist_ok=True)
     os.makedirs(os.path.dirname(out_testpath), exist_ok=True)
 
-all_stays = pd.read_csv(f"{os.getenv('BHF_ROOT')}/JSS_SUBMISSION_NEW/tmp/all_stays.csv")
+all_stays = pd.read_csv(f"{os.getenv('BHF_ROOT')}/JSS_SUBMISSION/tmp/all_stays.csv")
 
 if args.note_type == "discharge":
     discharge = pd.read_csv(f"{os.getenv('NOTE_DIR')}/discharge.csv")

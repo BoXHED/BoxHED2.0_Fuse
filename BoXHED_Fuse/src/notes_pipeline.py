@@ -14,7 +14,7 @@ from BoXHED_Fuse.src.helpers import find_next_dir_index
 """
 ROOT_DIR = os.getenv("BHF_ROOT")
 SRC_DIR = f"{ROOT_DIR}/src"
-MIMIC_EXTRACT_DIR = f"{ROOT_DIR}/JSS_SUBMISSION_NEW"
+MIMIC_EXTRACT_DIR = f"{ROOT_DIR}/JSS_SUBMISSION"
 NOTE_DIR = os.getenv("NOTE_DIR")
 RADIOLOGY_PATH = os.path.join(NOTE_DIR, "radiology.csv")
 DISCHARGE_PATH = os.path.join(NOTE_DIR, "discharge.csv")

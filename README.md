@@ -20,9 +20,10 @@ For the BoXHED 2.0 paper, please refer to [Pakbin et al. (2023)](#suggested-cita
 - conda  (we recommend using the free [Anaconda distribution](https://docs.anaconda.com/anaconda/install/))
 
 ## How to use BoXHED Fuse -- Overview
-1. Obtain data -- Use MIMIC-IV-Extract (TODO LINKME). This is the data we will augment with note embeddings
-2. Get embeddings -- BoXHED Fuse will take care of this. The [tutorial](#tutorial) below explains this in detail.
-3. Feed into [BoXHED 2.0](https://github.com/BoXHED/BoXHED2.0) -- Use BoXHED Fuse outputs to train and test on BoXHED 2.0
+1. Obtain MIMIC IV data
+2. Preprocess MIMIC IV data using MIMIC-IV-Extract.
+3. Get note embeddings and augment preprocessed data. This is BoXHED Fuse's main functionality.
+4. Feed into [BoXHED 2.0](https://github.com/BoXHED/BoXHED2.0) -- Use BoXHED Fuse outputs to train and test on BoXHED 2.0
 
 
 
@@ -31,12 +32,12 @@ For the BoXHED 2.0 paper, please refer to [Pakbin et al. (2023)](#suggested-cita
 ## Obtaining Data
 TODO describe permissions for MIMIC IV
 
-## Preprocess Data
-TODO link to and explain MIMIC IV EXTRACT
-
-
 ## Setting up BoXHED Fuse
 
+First, clone this repository.
+```
+$ git clone https://github.com/BoXHED/BoxHED_Fuse.git
+```
 ### Environment 
 Set up a dedicated virtual environment for BoXHED Fuse. First, create a virtual environment called BoXHED_Fuse:
 ```
@@ -51,19 +52,26 @@ $ conda activate BoXHED_Fuse
 To setup environment, navigate to root "BoXHED_Fuse" directory. Install packages and run setup.py.
 
 ```
-# Your directory should look something like
-# .
-# ├── BoXHED_Fuse
-# ├── environment.yml
-# ├── README.md
-# ├── requirements.txt
-# └── setup.py
-
 $ python setup.py install 
 # This allows module imports
 
 $ pip install -e .
 # Any modifications to the BoXHED_Fuse package will automatically be reflected in the build.
+```
+
+
+
+Navigate to the BoXHED_Fuse/BoXHED_Fuse directory
+```
+
+```
+```
+#  BoXHED_Fuse
+# ├── BoXHED_Fuse
+# │   ├── __init__.py
+# │   └── JSS_SUBMISSION
+
+
 ```
 
 ### Define environmental varaibles
@@ -111,11 +119,11 @@ Python scripts are stored in BoXHED_Fuse/src. Navigate there.
 
 ```
 # to get usage details:
-    > python <script_name>.py --h 
+    $ python <script_name>.py --h 
 
 # use those arguments to run the file from the terminal. For example,
 
-    > python add_notes.py --test --use-wandb --note-type radiology --noteid-mode recent
+    $ python add_notes.py --test --use-wandb --note-type radiology --noteid-mode recent
 ```
 
 ### OPTION 2: bash script
@@ -126,8 +134,8 @@ A default bash script is supplied for each python script.
 
 To change arguments, I recommend creating a new bash script. For example you could create add_notes_1.sh, add_notes_2.sh, etc. 
 ```
-    > bash <script_name>.sh
-    
+# example:
+    $ bash <script_name>.sh 
 ```
 
 
@@ -137,19 +145,27 @@ This streamlines bash scripts into a single pipeline. Simply supply the bash scr
 
 ```
 # How to use notes pipeline:
-$ python notes_pipeline.py --h
+
+$ python notes_pipeline.py
+
 usage: notes_pipeline.py [-h] [--bash-files BASH_FILES [BASH_FILES ...]]
-                         [--run-scripts RUN_SCRIPTS [RUN_SCRIPTS ...]]
+                            [--run-scripts RUN_SCRIPTS [RUN_SCRIPTS ...]]
 
-Process bash file names and run scripts.
+    Process bash file names and run scripts.
 
-options:
-  -h, --help            show this help message and exit
-  --bash-files BASH_FILES [BASH_FILES ...]
-                        List of bash file names
-  --run-scripts RUN_SCRIPTS [RUN_SCRIPTS ...]
-                        List of boolean values indicating whether to run
-                        each script
+    options:
+    -h, --help            show this help message and exit
+    --bash-files BASH_FILES [BASH_FILES ...]
+                            List of bash file names
+    --run-scripts RUN_SCRIPTS [RUN_SCRIPTS ...]
+                            List of boolean values indicating whether to run
+                            each script
+```
+
+## Feed data into BoXHED 2.0
+Final embedding-augmented data is stored at 
+```
+
 ```
 
 
