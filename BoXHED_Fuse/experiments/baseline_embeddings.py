@@ -81,8 +81,8 @@ if __name__ == '__main__':
     SWEEP_ID = -1
     MODEL_NAME = 'Clinical-T5-Base'
     MODEL_DIR = os.path.join('os.getenv('BHF_ROOT')/models', MODEL_NAME)
-    TRAIN_PATH = f'{os.getenv("BHF_ROOT")}/JSS_SUBMISSION/data/till_end_mimic_iv_extra_features_train_NOTE_rad_recent.csv'
-    TEST_PATH = f'{os.getenv("BHF_ROOT")}/JSS_SUBMISSION/data/till_end_mimic_iv_extra_features_test_NOTE_rad_recent.csv'
+    TRAIN_PATH = f'{os.getenv("BHF_ROOT")}/data/till_end_mimic_iv_extra_features_train_NOTE_rad_recent.csv'
+    TEST_PATH = f'{os.getenv("BHF_ROOT")}/data/till_end_mimic_iv_extra_features_test_NOTE_rad_recent.csv'
     DEVICE = torch.device(f'cuda' if torch.cuda.is_available() else 'cpu')
 
     os.environ["CUDA_VISIBLE_DEVICES"] = str(GPU_NO)  # use the correct gpu

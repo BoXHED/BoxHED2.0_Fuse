@@ -18,6 +18,7 @@ For the BoXHED 2.0 paper, please refer to [Pakbin et al. (2023)](#suggested-cita
 ## Prerequisites
 - Python (=3.10)
 - conda  (we recommend using the free [Anaconda distribution](https://docs.anaconda.com/anaconda/install/))
+- 1 or more GPUs
 
 ## How to use BoXHED Fuse -- Overview
 1. Obtain MIMIC IV data
@@ -28,9 +29,20 @@ For the BoXHED 2.0 paper, please refer to [Pakbin et al. (2023)](#suggested-cita
 
 
 # TUTORIAL
-
 ## Obtaining Data
-TODO describe permissions for MIMIC IV
+All data for BoXHED Fuse comes from MIMIC IV, a large, freely-available database comprising deidentified health-related data from 299,712 patients from Beth Israel Deaconess Medical Center (BIDMC).
+
+We use [MIMIC IV](https://physionet.org/content/mimiciv/2.2/)  v2.2 and [MIMIC IV Note](https://physionet.org/content/mimic-iv-note/2.2/)  v2.2. You will need to download data from both of these sources.
+
+The overall steps to obtain data are:
+1. be a credentialed user
+2. complete required training: CITI Data or Specimens Only Research
+3. sign the data use agreement for the project
+
+Detailed instructions for obtaining data are listed in the MIMIC IV and MIMIC IV Note links, above.
+
+Once you have access to both databases, download the files in any two locations. In total, this takes ~ 9 GB of storage. Make note of where they are stored, as we will reference them later.
+
 
 ## Setting up BoXHED Fuse
 
@@ -70,8 +82,6 @@ Navigate to the BoXHED_Fuse/BoXHED_Fuse directory
 # ├── BoXHED_Fuse
 # │   ├── __init__.py
 # │   └── JSS_SUBMISSION
-
-
 ```
 
 ### Define environmental varaibles

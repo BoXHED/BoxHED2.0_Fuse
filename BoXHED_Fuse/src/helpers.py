@@ -337,7 +337,7 @@ if __name__ == "__main__":
         label_ids=label_ids_example, predictions=predictions_example
     )
     print(compute_metrics(pred=pred, num_labels=6))
-    # train_target_path = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION/data/targets/testing/till_end_mimic_iv_extra_features_train_NOTE_TARGET_2_rad_all.csv'
+    # train_target_path = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/data/targets/testing/till_end_mimic_iv_extra_features_train_NOTE_TARGET_2_rad_all.csv'
     # train_target = pd.read_csv(train_target_path, converters = {'NOTE_ID_SEQ': convert_to_list})
     # target = 'delta_in_2_days'
     # train_target = train_target.rename(columns = {target:'label'})
@@ -352,5 +352,5 @@ if __name__ == "__main__":
     # print(train_target_embseq.head())
     # validate_train_target_embseq(train_target_embseq.copy())
 
-    # train_embs_path = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/JSS_SUBMISSION/data/embs{"/testing"}/{"Clinical-T5-Base"}_{"rad"}_{"all"}_out/from_epoch1/1/train_embs.pt'
+    # train_embs_path = f'/home/ugrads/a/aa_ron_su/BoXHED_Fuse/data/embs{"/testing"}/{"Clinical-T5-Base"}_{"rad"}_{"all"}_out/from_epoch1/1/train_embs.pt'
     # train_embs = torch.load(train_embs_path)
