@@ -64,9 +64,6 @@ $ conda activate BoXHED_Fuse
 To setup environment, navigate to root "BoXHED_Fuse" directory. Install packages and run setup.py.
 
 ```
-$ python setup.py install 
-# This allows module imports
-
 $ pip install -e .
 # Any modifications to the BoXHED_Fuse package will automatically be reflected in the build.
 ```
@@ -106,6 +103,7 @@ export WANDB_KEY="<your_key>"
 export WANDB_PROJECT_NAME="<your_project_name>" 
 export BHF_ROOT="<your_root_path>/BoXHED_Fuse/BoXHED_Fuse/"
 export NOTE_DIR="<your_note_dir>/
+export ALL_STAYS_DIR=".../JSS_SUBMISSION/.../all_stays.csv" # FIXME add instr for this path
 
 # This only needs to be done once to ensure the environmental variable is set.
     $ source ~/.bashrc

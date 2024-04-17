@@ -230,7 +230,7 @@ if args.test:
     os.makedirs(os.path.dirname(out_trainpath), exist_ok=True)
     os.makedirs(os.path.dirname(out_testpath), exist_ok=True)
 
-all_stays = pd.read_csv(f"{os.getenv('BHF_ROOT')}/JSS_SUBMISSION/tmp/all_stays.csv")
+all_stays = pd.read_csv(f"{os.getenv('ALL_STAYS_PATH')}")
 
 if args.note_type == "discharge":
     discharge = pd.read_csv(f"{os.getenv('NOTE_DIR')}/discharge.csv")

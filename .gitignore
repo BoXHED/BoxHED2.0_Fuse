@@ -1,5 +1,14 @@
-# IGNORE DATA
-BoXHED_Fuse/JSS_SUBMISSION_NEW/
+# IGNORE BUILD
+build/
+BoXHED_Fuse.egg-info
+dist
+.vscode
+
+# IGNORE JSS_SUBMISSION
+BoXHED_Fuse/JSS_SUBMISSION/
+
+# IGNORE LOGS
+BoXHED_Fuse/src/logs
 
 # IGNORE CACHES
 *.pyc
@@ -21,16 +30,15 @@ BoXHED_Fuse/models/Clinical-T5-Scratch
 BoXHED_Fuse/model_outputs/
 
 
-# IGNORE SCRIPTS
-BoXHED_Fuse/scripts/
+# # IGNORE SCRIPTS
+# BoXHED_Fuse/scripts/
+BoXHED_Fuse/scripts/custom
 
 # IGNORE DEV SCRIPTS/ DATA
+data/
 old_data/*
 views
 viewer*.ipynb
 
 # IGNORE EXTRANEOUS PACKAGES
 extraneous/
-
-BoXHED_Fuse.egg-info
-settings.json
