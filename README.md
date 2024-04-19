@@ -1,12 +1,12 @@
 # BoXHED Fuse
 
-BoXHED Fuse is a clinical note embedding pipeline designed for BoXHED 2.0, a software package for nonparametrically estimating hazard functions via gradient boosted trees. BoXHED Fuse aims to improve BoXHED 2.0's training capabilities by enriching its dataset with note embeddings.
+BoXHED Fuse is a clinical note embedding pipeline designed for BoXHED 2.0, a gradient boosted hazard estimator. BoXHED Fuse aims to enriching BoXHED 2.0's dataset with note embeddings.
 
-As a repository, BoXHED Fuse functions independently of BoXHED 2.0. It transforms clinical notes from MIMIC IV electronic health records (EHR) into note embeddings, which are merged with BoXHED 2.0 time-series data. The resulting augmented dataset is directly usable for BoXHED 2.0.
+As a package, BoXHED Fuse functions independently of BoXHED 2.0. It transforms clinical notes from MIMIC IV electronic health records (EHR) into note embeddings, which are merged with BoXHED 2.0 time-series data. The resulting augmented dataset is directly usable for BoXHED 2.0.
 
 For the BoXHED 2.0 repository, click [here](https://github.com/BoXHED/BoXHED2.0).
 
-For the BoXHED 2.0 paper, please refer to [Pakbin et al. (2023)](#suggested-citations) for details.
+Please refer to [Pakbin et al. (2023)](#suggested-citations) for the BoXHED 2.0 paper.
 
 
 
@@ -43,10 +43,25 @@ Detailed instructions for obtaining data are listed in the MIMIC IV and MIMIC IV
 
 Once you have access to both databases, download the files in any two locations. In total, this takes ~ 9 GB of storage. Make note of where they are stored, as we will reference them later.
 
+### Preprocess Data
+In any directory, clone [JSS_SUBMISSION](https://github.com/BoXHED/JSS_SUBMISSION/tree/master/Code)
+
+```
+git clone https://github.com/BoXHED/JSS_SUBMISSION.git
+```
+
+Follow instructions in JSS_SUBMISSION/Code/README.txt to setup an environment for JSS_SUBMISSION.
+
+You only need to run section 6, step 1, titled "1. Extract invasive ventilation (iV) data from MIMIC IV database"
+
+You may need to add a line to import repl_util, as it is imported earlier in the notebook.
+
+After data is preprocessed, make note of where it is stored. Likely, this will be in 
+JSS_SUBMISSION/Code/tmp and JSS_SUBMISSION/Code/data
 
 ## Setting up BoXHED Fuse
 
-First, clone this repository.
+In any directory, clone this repository.
 ```
 $ git clone https://github.com/BoXHED/BoxHED_Fuse.git
 ```
@@ -69,18 +84,6 @@ $ pip install -e .
 ```
 
 
-
-Navigate to the BoXHED_Fuse/BoXHED_Fuse directory
-```
-
-```
-```
-#  BoXHED_Fuse
-# ├── BoXHED_Fuse
-# │   ├── __init__.py
-# │   └── JSS_SUBMISSION
-```
-
 ### Define environmental varaibles
 
 Some scripts contain a --use-wandb argument. If you wish to use wandb to track finetuning progress and store data artifacts, you must obtain a wandb key.
@@ -89,10 +92,7 @@ To get your login key, you can head to wandb.ai to create an account. Then go to
 
 The WANDB_PROJECT_NAME is a name of your choice, which will create a wandb project. Create a unique project name. For example "BoXHED_Fuse".
 
-BHF_ROOT is used to define paths. You can find it by navigating to BoXHED_Fuse/BoXHED_Fuse and entering the command 
-```
-$ pwd
-```
+BHF_ROOT is used to define paths. You can find it by navigating to BoXHED_Fuse/BoXHED_Fuse and entering the command $ pwd
 
 NOTE_DIR is the directroy where your MIMIC IV notes from physionet.org are stored. This may look like some variation of "<your_note_dir>/physionet.org/files/mimic-iv-note/2.2/note/"
 
@@ -103,20 +103,14 @@ export WANDB_KEY="<your_key>"
 export WANDB_PROJECT_NAME="<your_project_name>" 
 export BHF_ROOT="<your_root_path>/BoXHED_Fuse/BoXHED_Fuse/"
 export NOTE_DIR="<your_note_dir>/
-export ALL_STAYS_DIR=".../JSS_SUBMISSION/.../all_stays.csv" # FIXME add instr for this path
 
 # This only needs to be done once to ensure the environmental variable is set.
     $ source ~/.bashrc
 
 # Verify that the variables are set
-    $ echo $WANDB_KEY
-    <your_key>
-    $ echo $WANDB_PROJECT_NAME
-    <your_project_name>
-    $ echo $BHF_ROOT
-    <your_root_path>/BoXHED_Fuse/BoXHED_Fuse/>   
-    $ echo $NOTE_DIR
-    <your_note_dir>/physionet.org/files/mimic-iv-note/2.2/note/ 
+    $ echo $<your_var>
+    <your_var>
+    
 ```
 ## Running BoXHED Fuse
 
