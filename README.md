@@ -102,15 +102,13 @@ In your .bashrc, add the specified environmental variables, shown below. This wi
 export WANDB_KEY="<your_key>"
 export WANDB_PROJECT_NAME="<your_project_name>" 
 export BHF_ROOT="<your_root_path>/BoXHED_Fuse/BoXHED_Fuse/"
-export NOTE_DIR="<your_note_dir>/
+export NOTE_DIR="<your_note_dir>/"
 
 # This only needs to be done once to ensure the environmental variable is set.
     $ source ~/.bashrc
 
 # Verify that the variables are set
     $ echo $<your_var>
-    <your_var>
-    
 ```
 ## Running BoXHED Fuse
 
