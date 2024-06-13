@@ -63,23 +63,23 @@ JSS_SUBMISSION/Code/tmp and JSS_SUBMISSION/Code/data
 
 In any directory, clone this repository.
 ```
-$ git clone https://github.com/BoXHED/BoxHED_Fuse.git
+git clone https://github.com/BoXHED/BoxHED_Fuse.git
 ```
 ### Environment 
 Set up a dedicated virtual environment for BoXHED Fuse. First, create a virtual environment called BoXHED_Fuse:
 ```
-$ conda create -n BoXHED_Fuse python=3.10
+conda create -n BoXHED_Fuse python=3.10
 ```
 
 then activate it
 ```
-$ conda activate BoXHED_Fuse
+conda activate BoXHED_Fuse
 ```
 
 To setup environment, navigate to root "BoXHED_Fuse" directory. Install packages and run setup.py.
 
 ```
-$ pip install -e .
+pip install -e .
 # Any modifications to the BoXHED_Fuse package will automatically be reflected in the build.
 ```
 
